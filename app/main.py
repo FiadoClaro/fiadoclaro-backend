@@ -1,8 +1,12 @@
+import time
+
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from sqlalchemy import text
 
 from app.core.config import settings
+from app.core.database import engine
 from app.core.errors import BusinessError
 from app.modules.audit.router import router as audit_router
 from app.modules.customers.router import router as customers_router
@@ -56,3 +60,24 @@ for r in (
 @app.get("/health", tags=["Sistema"])
 def health():
     return {"status": "ok"}
+
+
+@app.get("/health/db", tags=["Sistema"])
+def health_db():
+    """Verifica que la base de datos responda y que las migraciones estén aplicadas."""
+    started = time.perf_counter()
+    try:
+        with engine.connect() as conn:
+            conn.execute(text("SELECT 1"))
+            revision = conn.execute(text("SELECT version_num FROM alembic_version")).scalar()
+    except Exception as exc:  # noqa: BLE001
+        return JSONResponse(
+            status_code=503,
+            content={"status": "error", "database": "unreachable", "detail": exc.__class__.__name__},
+        )
+    return {
+        "status": "ok",
+        "database": "reachable",
+        "alembic_revision": revision,
+        "latency_ms": round((time.perf_counter() - started) * 1000, 1),
+    }
