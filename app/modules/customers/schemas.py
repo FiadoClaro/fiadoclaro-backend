@@ -5,7 +5,7 @@ from typing import Literal
 from pydantic import BaseModel, EmailStr, Field, model_validator
 
 from app.modules.finance.schemas import EquivalenciasOut, TasaIn
-from app.modules.iam.schemas import Credenciales
+from app.modules.iam.schemas import AccesoCliente
 
 
 class ClienteDatos(BaseModel):
@@ -38,7 +38,7 @@ class CondicionIn(BaseModel):
 class ClienteCreate(ClienteDatos):
     dni: str = Field(pattern=r"^\d{8}$", description="DNI de 8 dígitos")
     condicion: CondicionIn
-    acceso: Credenciales = Field(description="Usuario y contraseña del vecino para el portal")
+    acceso: AccesoCliente = Field(description="Acceso al portal: usuario <DNI>@<dominio de la tienda> y contraseña provisional")
 
 
 class ClienteUpdate(BaseModel):

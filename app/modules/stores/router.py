@@ -3,6 +3,7 @@ from typing import Literal
 from fastapi import APIRouter, Query, status
 
 from app.core.deps import DbSession, SystemAdmin
+from app.core.pagination import Pagina
 from app.modules.stores import service
 from app.modules.stores.schemas import TiendaCreate, TiendaOut, TiendaUpdate
 
@@ -15,13 +16,14 @@ def crear(body: TiendaCreate, db: DbSession, actor: SystemAdmin):
     return service.crear(db, actor, body)
 
 
-@router.get("", response_model=list[TiendaOut], summary="Listar tiendas afiliadas")
+@router.get("", response_model=Pagina[TiendaOut],
+            summary="Listar tiendas afiliadas (con total y conteos por estado y giro)")
 def listar(
     db: DbSession,
     actor: SystemAdmin,
     estado: Literal["ACTIVA", "BAJA"] | None = None,
     giro: str | None = None,
-    q: str | None = Query(None, description="Busca por nombre comercial, RUC o distrito"),
+    q: str | None = Query(None, description="Busca por nombre comercial, razón social o RUC"),
     limit: int = Query(50, ge=1, le=200),
     offset: int = Query(0, ge=0),
 ):
@@ -33,7 +35,8 @@ def detalle(tienda_id: int, db: DbSession, actor: SystemAdmin):
     return service.detalle(db, tienda_id)
 
 
-@router.patch("/{tienda_id}", response_model=TiendaOut, summary="Editar datos de una tienda")
+@router.patch("/{tienda_id}", response_model=TiendaOut,
+              summary="Editar datos de una tienda y del contacto de su administrador")
 def actualizar(tienda_id: int, body: TiendaUpdate, db: DbSession, actor: SystemAdmin):
     return service.actualizar(db, actor, tienda_id, body)
 

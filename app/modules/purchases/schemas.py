@@ -80,6 +80,9 @@ class SimulacionOut(BaseModel):
     cronograma: list[CuotaOut]
     credito_disponible_antes: Decimal | None = None
     credito_disponible_despues: Decimal | None = None
+    excede_credito: bool = Field(False, description="True si el monto supera el crédito disponible")
+    deficit: Decimal = Field(Decimal("0.00"), description="Cuánto falta de crédito para poder registrarla")
+    mensaje: str | None = Field(None, description="Aviso para mostrar cuando la compra no se puede registrar")
 
 
 class CompraOut(SimulacionOut):

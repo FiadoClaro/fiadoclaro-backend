@@ -36,9 +36,9 @@ uvicorn app.main:app --reload
 | Crear tablas / aplicar cambios | `alembic upgrade head` |
 | Nueva migración tras cambiar un modelo | `alembic revision --autogenerate -m "describe el cambio"` |
 | Cargar datos base | `python -m scripts.seed` (agrega `--demo` para datos de ejemplo) |
-| Pruebas | `createdb fiadoclaro_test` y luego `pytest -q` |
+| Pruebas | `pytest -q` (todas) o `pytest -q -m "not integracion"` (solo cálculos, sin base de datos) |
 
-Usuarios de la semilla: `admin / Admin123*` (sistema), `dlucho / Lucho2026*` (tienda), `rosa.flores / Rosa2024*Lucho` (cliente).
+Usuarios de la semilla: `admin / Admin123*` (sistema), `dlucho / Lucho2026*` (tienda), `08765432@bodegadonlucho.com / Rosa2024*Lucho` (cliente).
 
 ## Estructura por módulos
 

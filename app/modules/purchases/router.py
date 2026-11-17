@@ -4,6 +4,7 @@ from typing import Literal
 from fastapi import APIRouter, Query, status
 
 from app.core.deps import DbSession, StoreAdmin
+from app.core.pagination import Pagina
 from app.modules.purchases import service
 from app.modules.purchases.schemas import CompraIn, CompraOut, CompraResumenOut, SimulacionOut
 
@@ -22,7 +23,7 @@ def registrar(body: CompraIn, db: DbSession, actor: StoreAdmin):
     return service.registrar_compra(db, actor, body)
 
 
-@router.get("", response_model=list[CompraResumenOut], summary="Listar compras")
+@router.get("", response_model=Pagina[CompraResumenOut], summary="Listar compras (con total y conteos por estado)")
 def listar(
     db: DbSession,
     actor: StoreAdmin,

@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 from app.core.clock import ahora, hoy
 from app.core.deps import Actor
 from app.core.errors import BusinessError, ConflictError, NotFoundError
+from app.core.pagination import Pagina
 from app.modules.audit.service import registrar
 from app.modules.customers.models import Cliente, CondicionCredito
 from app.modules.customers.schemas import (
@@ -23,6 +24,7 @@ from app.modules.iam.models import Usuario
 from app.modules.iam.service import crear_usuario
 from app.modules.purchases.models import Compra, Cuota
 from app.modules.statements.models import EstadoCuenta
+from app.modules.stores.models import Tienda
 
 CERO = Decimal("0")
 
@@ -116,13 +118,31 @@ def _aplicar_condicion(db: Session, cond: CondicionCredito, data: CondicionIn) -
     cond.dia_corte, cond.hora_corte, cond.dia_pago = data.dia_corte, data.hora_corte, data.dia_pago
 
 
+def usuario_portal(db: Session, tienda_id: int, dni: str, propuesto: str | None) -> str:
+    """
+    Usuario del vecino en el portal: <DNI>@<dominio de la tienda> (ej. 08765432@bodegadonlucho.com).
+    Si la tienda no lo envía, se arma solo; si lo envía, debe empezar con el DNI del cliente.
+    """
+    if not propuesto:
+        return f"{dni}@{db.get(Tienda, tienda_id).dominio_portal}"
+    if propuesto.split("@")[0] != dni:
+        raise BusinessError(
+            f"El usuario del portal debe empezar con el DNI del cliente, por ejemplo "
+            f"{dni}@{db.get(Tienda, tienda_id).dominio_portal}",
+            code="usuario_portal_invalido",
+        )
+    return propuesto
+
+
 # --------------------------------------------------------------- comandos
 def crear(db: Session, actor: Actor, data: ClienteCreate) -> ClienteOut:
     """Alta de cliente con su tasa, límite, plazo máximo, corte y pago (enunciado, punto 3)."""
     if db.scalar(select(Cliente.id).where(Cliente.tienda_id == actor.tienda_id, Cliente.dni == data.dni)):
         raise ConflictError(f"Ya existe un cliente con DNI {data.dni} en esta tienda")
     nombre = f"{data.nombres} {data.apellidos}"
-    usuario = crear_usuario(db, data.acceso, "CLIENTE", nombre, actor.tienda_id)
+    username = usuario_portal(db, actor.tienda_id, data.dni, data.acceso.username)
+    usuario = crear_usuario(db, username, data.acceso.password, "CLIENTE", nombre, actor.tienda_id,
+                            data.telefono, data.correo)
     cliente = Cliente(
         tienda_id=actor.tienda_id, usuario_id=usuario.id, dni=data.dni,
         **data.model_dump(include={"nombres", "apellidos", "telefono", "correo", "direccion"}),
@@ -139,24 +159,48 @@ def crear(db: Session, actor: Actor, data: ClienteCreate) -> ClienteOut:
     return to_out(db, cliente)
 
 
-def listar(db: Session, actor: Actor, estado: str | None, q: str | None, limit: int, offset: int) -> list[ClienteOut]:
+def listar(db: Session, actor: Actor, estado: str | None, q: str | None,
+           limit: int, offset: int) -> Pagina[ClienteOut]:
+    """
+    Cartera de clientes con su resumen de crédito.
+    `conteos.estado` alimenta los filtros: TODOS, ACTIVO, BAJA, AL_DIA y EN_MORA (los dos últimos
+    solo cuentan clientes activos). Se calculan con la búsqueda aplicada.
+    """
     stmt = select(Cliente).where(Cliente.tienda_id == actor.tienda_id)
-    if estado in ("ACTIVO", "BAJA"):
-        stmt = stmt.where(Cliente.estado == estado)
     if q:
-        like = f"%{q}%"
+        like = f"%{q.strip()}%"
         stmt = stmt.where(or_(Cliente.dni.like(like), Cliente.nombres.ilike(like), Cliente.apellidos.ilike(like)))
-    clientes = [to_out(db, c) for c in db.scalars(stmt.order_by(Cliente.apellidos, Cliente.nombres)).unique()]
-    if estado in ("AL_DIA", "EN_MORA"):
-        clientes = [c for c in clientes if c.estado == "ACTIVO" and c.resumen.estado_pago == estado]
-    return clientes[offset: offset + limit]
+    # El estado de pago (al día / en mora) se calcula por cliente, así que se filtra en memoria.
+    todos = [to_out(db, c) for c in db.scalars(stmt.order_by(Cliente.apellidos, Cliente.nombres)).unique()]
+    activos = [c for c in todos if c.estado == "ACTIVO"]
+    conteos = {
+        "TODOS": len(todos),
+        "ACTIVO": len(activos),
+        "BAJA": len(todos) - len(activos),
+        "AL_DIA": sum(1 for c in activos if c.resumen.estado_pago == "AL_DIA"),
+        "EN_MORA": sum(1 for c in activos if c.resumen.estado_pago == "EN_MORA"),
+    }
+    if estado in ("ACTIVO", "BAJA"):
+        filtrados = [c for c in todos if c.estado == estado]
+    elif estado in ("AL_DIA", "EN_MORA"):
+        filtrados = [c for c in activos if c.resumen.estado_pago == estado]
+    else:
+        filtrados = todos
+    return Pagina(items=filtrados[offset: offset + limit], total=len(filtrados), limit=limit, offset=offset,
+                  conteos={"estado": conteos})
 
 
 def actualizar(db: Session, actor: Actor, cliente_id: int, data: ClienteUpdate) -> ClienteOut:
     cliente = obtener(db, actor, cliente_id)
     cambios = data.model_dump(exclude_unset=True)
+    if not cambios:
+        raise BusinessError("No enviaste ningún dato para actualizar", code="sin_cambios")
     for k, v in cambios.items():
         setattr(cliente, k, v)
+    # El usuario del portal refleja el nombre y el contacto de la ficha del cliente
+    usuario = db.get(Usuario, cliente.usuario_id)
+    usuario.nombre = f"{cliente.nombres} {cliente.apellidos}"
+    usuario.telefono, usuario.correo = cliente.telefono, cliente.correo
     registrar(db, actor, "ACTUALIZAR", "cliente", cliente.id, cambios)
     db.commit()
     return to_out(db, cliente)

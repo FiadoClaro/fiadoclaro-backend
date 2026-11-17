@@ -15,6 +15,7 @@ from sqlalchemy.orm import Session
 from app.core.clock import hoy
 from app.core.deps import Actor
 from app.core.errors import BusinessError, NotFoundError
+from app.core.pagination import Pagina, paginar
 from app.modules.audit.service import registrar
 from app.modules.finance import engine
 from app.modules.payments.models import Pago
@@ -107,8 +108,9 @@ def obtener(db: Session, actor: Actor, pago_id: int) -> Pago:
     return p
 
 
-def listar(db: Session, actor: Actor, cliente_id: int | None, limit: int, offset: int) -> list[PagoOut]:
+def listar(db: Session, actor: Actor, cliente_id: int | None, limit: int, offset: int) -> Pagina[PagoOut]:
     q = select(Pago).where(Pago.tienda_id == actor.tienda_id)
     if cliente_id:
         q = q.where(Pago.cliente_id == cliente_id)
-    return [to_out(p) for p in db.scalars(q.order_by(Pago.id.desc()).limit(limit).offset(offset))]
+    pagos, total = paginar(db, q.order_by(Pago.id.desc()), limit, offset)
+    return Pagina(items=[to_out(p) for p in pagos], total=total, limit=limit, offset=offset)

@@ -3,6 +3,7 @@ from datetime import date
 from fastapi import APIRouter, Query, status
 
 from app.core.deps import DbSession, StoreAdmin
+from app.core.pagination import Pagina
 from app.modules.payments import service
 from app.modules.payments.schemas import CotizacionOut, PagoIn, PagoOut
 
@@ -22,7 +23,7 @@ def registrar(body: PagoIn, db: DbSession, actor: StoreAdmin):
     return service.registrar_pago(db, actor, body)
 
 
-@router.get("", response_model=list[PagoOut], summary="Listar pagos")
+@router.get("", response_model=Pagina[PagoOut], summary="Listar pagos (con total)")
 def listar(db: DbSession, actor: StoreAdmin, cliente_id: int | None = None,
            limit: int = Query(50, ge=1, le=200), offset: int = Query(0, ge=0)):
     return service.listar(db, actor, cliente_id, limit, offset)

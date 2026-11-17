@@ -16,6 +16,7 @@ from sqlalchemy.orm import Session
 from app.core.clock import a_hora_local, ahora, hoy
 from app.core.deps import Actor
 from app.core.errors import BusinessError, NotFoundError
+from app.core.pagination import Pagina, contar, contar_por
 from app.modules.audit.service import registrar
 from app.modules.customers.models import Cliente, CondicionCredito
 from app.modules.finance import engine
@@ -205,17 +206,20 @@ def detalle(db: Session, ec: EstadoCuenta, fecha_consulta: date | None = None) -
 
 
 def listar(db: Session, actor: Actor, cliente_id: int | None, estado: str | None,
-           fecha_corte: date | None, limit: int, offset: int) -> list[EstadoCuentaResumen]:
+           fecha_corte: date | None, limit: int, offset: int) -> Pagina[EstadoCuentaResumen]:
     q = select(EstadoCuenta, Cliente).join(Cliente, Cliente.id == EstadoCuenta.cliente_id).where(
         EstadoCuenta.tienda_id == actor.tienda_id)
     if cliente_id:
         q = q.where(EstadoCuenta.cliente_id == cliente_id)
-    if estado:
-        q = q.where(EstadoCuenta.estado == estado)
     if fecha_corte:
         q = q.where(EstadoCuenta.fecha_corte == fecha_corte)
+    por_estado = contar_por(db, q, EstadoCuenta.estado)  # faceta: sin el filtro de estado
+    if estado:
+        q = q.where(EstadoCuenta.estado == estado)
+    total = contar(db, q)
     filas = db.execute(q.order_by(EstadoCuenta.fecha_corte.desc(), Cliente.apellidos).limit(limit).offset(offset))
-    return [_resumen(ec, cl) for ec, cl in filas]
+    return Pagina(items=[_resumen(ec, cl) for ec, cl in filas], total=total, limit=limit, offset=offset,
+                  conteos={"estado": por_estado})
 
 
 def validar_pendiente(ec: EstadoCuenta) -> None:

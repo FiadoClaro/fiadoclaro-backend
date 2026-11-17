@@ -3,6 +3,7 @@ from sqlalchemy.orm import Session
 
 from app.core.deps import Actor
 from app.core.errors import BusinessError, ConflictError, NotFoundError
+from app.core.pagination import Pagina, contar_por, paginar
 from app.modules.audit.service import registrar
 from app.modules.products.models import Producto
 from app.modules.products.schemas import ProductoCreate, ProductoUpdate
@@ -34,10 +35,8 @@ def crear(db: Session, actor: Actor, data: ProductoCreate) -> Producto:
 
 
 def listar(db: Session, actor: Actor, estado: str | None, q: str | None, modalidad: str | None,
-           limit: int, offset: int) -> list[Producto]:
+           limit: int, offset: int) -> Pagina:
     stmt = select(Producto).where(Producto.tienda_id == actor.tienda_id)
-    if estado:
-        stmt = stmt.where(Producto.estado == estado)
     if modalidad == "FIN_MES":
         stmt = stmt.where(Producto.permite_fin_mes.is_(True))
     elif modalidad == "CUOTAS":
@@ -45,7 +44,12 @@ def listar(db: Session, actor: Actor, estado: str | None, q: str | None, modalid
     if q:
         like = f"%{q}%"
         stmt = stmt.where(or_(Producto.nombre.ilike(like), Producto.codigo.ilike(like), Producto.marca.ilike(like)))
-    return list(db.scalars(stmt.order_by(Producto.nombre).limit(limit).offset(offset)))
+    por_estado = contar_por(db, stmt, Producto.estado)  # faceta: sin el filtro de estado
+    if estado:
+        stmt = stmt.where(Producto.estado == estado)
+    productos, total = paginar(db, stmt.order_by(Producto.nombre), limit, offset)
+    return Pagina(items=productos, total=total, limit=limit, offset=offset,
+                  conteos={"estado": {"TODOS": sum(por_estado.values()), **por_estado}})
 
 
 def actualizar(db: Session, actor: Actor, producto_id: int, data: ProductoUpdate) -> Producto:

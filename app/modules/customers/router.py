@@ -3,6 +3,7 @@ from typing import Literal
 from fastapi import APIRouter, Query, status
 
 from app.core.deps import DbSession, StoreAdmin
+from app.core.pagination import Pagina
 from app.modules.customers import service
 from app.modules.customers.schemas import ClienteCreate, ClienteOut, ClienteUpdate, CondicionIn, ResumenCredito
 
@@ -15,7 +16,8 @@ def crear(body: ClienteCreate, db: DbSession, actor: StoreAdmin):
     return service.crear(db, actor, body)
 
 
-@router.get("", response_model=list[ClienteOut], summary="Listar la cartera de clientes")
+@router.get("", response_model=Pagina[ClienteOut],
+            summary="Listar la cartera de clientes (con total y conteos por estado)")
 def listar(
     db: DbSession,
     actor: StoreAdmin,

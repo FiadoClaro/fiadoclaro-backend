@@ -1,8 +1,8 @@
 """esquema inicial
 
-Revision ID: 731dc787aaee
+Revision ID: b804b4d207b4
 Revises: 
-Create Date: 2026-11-17 15:14:45.820396
+Create Date: 2026-11-17 18:24:39.045112
 
 """
 from typing import Sequence, Union
@@ -12,7 +12,7 @@ import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
 
 # revision identifiers, used by Alembic.
-revision: str = '731dc787aaee'
+revision: str = 'b804b4d207b4'
 down_revision: Union[str, Sequence[str], None] = None
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
@@ -28,7 +28,6 @@ def upgrade() -> None:
     sa.Column('nombre_comercial', sa.String(length=120), nullable=False),
     sa.Column('giro', sa.String(length=40), nullable=False),
     sa.Column('direccion', sa.String(length=200), nullable=True),
-    sa.Column('distrito', sa.String(length=80), nullable=True),
     sa.Column('telefono', sa.String(length=20), nullable=True),
     sa.Column('correo', sa.String(length=120), nullable=True),
     sa.Column('estado', sa.String(length=10), nullable=False),
@@ -89,6 +88,8 @@ def upgrade() -> None:
     sa.Column('rol', sa.String(length=20), nullable=False),
     sa.Column('tienda_id', sa.Integer(), nullable=True),
     sa.Column('nombre', sa.String(length=120), nullable=False),
+    sa.Column('telefono', sa.String(length=20), nullable=True),
+    sa.Column('correo', sa.String(length=120), nullable=True),
     sa.Column('activo', sa.Boolean(), nullable=False),
     sa.Column('ultimo_acceso', sa.DateTime(timezone=True), nullable=True),
     sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),

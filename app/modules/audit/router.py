@@ -4,6 +4,7 @@ from fastapi import APIRouter, Query
 from pydantic import BaseModel, ConfigDict
 
 from app.core.deps import AnyAdmin, DbSession
+from app.core.pagination import Pagina
 from app.modules.audit import service
 
 router = APIRouter(prefix="/audit", tags=["Bitácora"])
@@ -23,7 +24,7 @@ class BitacoraOut(BaseModel):
     created_at: datetime
 
 
-@router.get("", response_model=list[BitacoraOut], summary="Listar operaciones registradas")
+@router.get("", response_model=Pagina[BitacoraOut], summary="Listar operaciones registradas (con total)")
 def listar(
     db: DbSession,
     actor: AnyAdmin,

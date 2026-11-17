@@ -1,6 +1,7 @@
 from datetime import date, datetime, time, timedelta
 
 from fastapi.encoders import jsonable_encoder
+from app.core.pagination import Pagina, paginar
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -41,7 +42,7 @@ def listar(
     hasta: date | None,
     limit: int,
     offset: int,
-) -> list[Bitacora]:
+) -> Pagina:
     q = select(Bitacora)
     if actor.rol == "ADMIN_TIENDA":
         q = q.where(Bitacora.tienda_id == actor.tienda_id)
@@ -53,4 +54,5 @@ def listar(
         q = q.where(Bitacora.created_at >= datetime.combine(desde, time.min, settings.tz))
     if hasta:
         q = q.where(Bitacora.created_at < datetime.combine(hasta + timedelta(days=1), time.min, settings.tz))
-    return list(db.scalars(q.order_by(Bitacora.id.desc()).limit(limit).offset(offset)))
+    filas, total = paginar(db, q.order_by(Bitacora.id.desc()), limit, offset)
+    return Pagina(items=filas, total=total, limit=limit, offset=offset)

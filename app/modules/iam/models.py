@@ -26,5 +26,7 @@ class Usuario(TimestampMixin, Base):
     rol: Mapped[str] = mapped_column(String(20))
     tienda_id: Mapped[int | None] = mapped_column(ForeignKey("tienda.id"), index=True)
     nombre: Mapped[str] = mapped_column(String(120))
+    telefono: Mapped[str | None] = mapped_column(String(20))   # contacto personal (perfil)
+    correo: Mapped[str | None] = mapped_column(String(120))    # contacto personal (perfil)
     activo: Mapped[bool] = mapped_column(Boolean, default=True)
     ultimo_acceso: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))

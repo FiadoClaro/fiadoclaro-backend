@@ -34,7 +34,7 @@ def me(db: DbSession, actor: CustomerUser):
 
 @router.get("/compras", response_model=list[CompraResumenOut], summary="Mis compras fiadas")
 def mis_compras(db: DbSession, actor: CustomerUser):
-    return purchases.listar(db, actor, None, None, None, None, 200, 0)
+    return purchases.listar(db, actor, None, None, None, None, 200, 0).items
 
 
 @router.get("/compras/{compra_id}", response_model=CompraOut, summary="Detalle y cronograma de mi compra")
@@ -47,7 +47,7 @@ def mi_compra(compra_id: int, db: DbSession, actor: CustomerUser):
 
 @router.get("/listados", response_model=list[EstadoCuentaResumen], summary="Mis listados de pago")
 def mis_listados(db: DbSession, actor: CustomerUser):
-    return statements.listar(db, actor, _mi_cliente(db, actor).id, None, None, 200, 0)
+    return statements.listar(db, actor, _mi_cliente(db, actor).id, None, None, 200, 0).items
 
 
 @router.get("/listados/{estado_cuenta_id}", response_model=EstadoCuentaOut,

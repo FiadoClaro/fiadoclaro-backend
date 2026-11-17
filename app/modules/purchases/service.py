@@ -14,6 +14,7 @@ from sqlalchemy.orm import Session
 
 from app.core.clock import a_hora_local, ahora
 from app.core.deps import Actor
+from app.core.pagination import Pagina, contar_por, paginar
 from app.core.errors import BusinessError, NotFoundError
 from app.modules.audit.service import registrar
 from app.modules.customers import service as customers
@@ -89,14 +90,11 @@ def _calcular(db: Session, actor: Actor, data: CompraIn) -> _Calculo:
         if data.num_cuotas > maximo:
             raise BusinessError(f"El máximo permitido para esta compra es {maximo} meses", code="excede_plazo")
 
-    # 4. Crédito disponible (no se permiten compras que excedan el límite)
+    # 4. Crédito disponible (no se permiten compras que excedan el límite).
+    #    La simulación igual devuelve el cálculo con el aviso; registrar_compra la rechaza.
     monto = engine.dinero(sum((d.subtotal for d in detalles), CERO))
     disponible = engine.dinero(cond.limite_credito - customers.capital_pendiente(db, cliente.id))
-    if monto > disponible:
-        raise BusinessError(
-            f"La compra (S/ {monto}) excede el crédito disponible del cliente (S/ {disponible})",
-            code="excede_credito",
-        )
+    deficit = engine.dinero(max(CERO, monto - disponible))
 
     # 5. Tasas pactadas y validación del tope vigente
     comp, mora = customers.tasas_de_condicion(cond)
@@ -128,6 +126,9 @@ def _calcular(db: Session, actor: Actor, data: CompraIn) -> _Calculo:
         monto_capitalizado=capitalizado, valor_cuota=valor_cuota, total_a_pagar=total, tcea_pct=tcea_pct,
         cronograma=cronograma, credito_disponible_antes=disponible,
         credito_disponible_despues=engine.dinero(disponible - monto),
+        excede_credito=deficit > 0, deficit=deficit,
+        mensaje=(f"La compra (S/ {monto}) excede el crédito disponible del cliente (S/ {disponible}) "
+                 f"en S/ {deficit}. No se puede registrar." if deficit > 0 else None),
     )
     return _Calculo(cliente, sim, comp, mora)
 
@@ -150,6 +151,9 @@ def simular(db: Session, actor: Actor, data: CompraIn) -> SimulacionOut:
 def registrar_compra(db: Session, actor: Actor, data: CompraIn) -> CompraOut:
     calc = _calcular(db, actor, data)
     s, comp, mora = calc.sim, calc.comp, calc.mora
+    if s.excede_credito:
+        raise BusinessError(s.mensaje, code="excede_credito", datos={
+            "disponible": s.credito_disponible_antes, "solicitado": s.monto_total, "deficit": s.deficit})
     compra = Compra(
         tienda_id=actor.tienda_id, cliente_id=s.cliente_id, registrado_por=actor.id, fecha_hora=s.fecha_hora,
         modalidad=s.modalidad, num_cuotas=s.num_cuotas, moneda=s.moneda, monto_total=s.monto_total,
@@ -203,20 +207,22 @@ def to_out(c: Compra) -> CompraOut:
 
 
 def listar(db: Session, actor: Actor, cliente_id: int | None, estado: str | None,
-           desde: date | None, hasta: date | None, limit: int, offset: int) -> list[CompraResumenOut]:
+           desde: date | None, hasta: date | None, limit: int, offset: int) -> Pagina[CompraResumenOut]:
     q = select(Compra).where(Compra.tienda_id == actor.tienda_id)
     if actor.rol == "CLIENTE":
         cliente_id = db.scalar(select(Cliente.id).where(Cliente.usuario_id == actor.id))
     if cliente_id:
         q = q.where(Compra.cliente_id == cliente_id)
-    if estado:
-        q = q.where(Compra.estado == estado)
     if desde:
         q = q.where(Compra.fecha_hora >= a_hora_local(_inicio(desde)))
     if hasta:
         q = q.where(Compra.fecha_hora < a_hora_local(_inicio(hasta, dias=1)))
-    compras = db.scalars(q.order_by(Compra.fecha_hora.desc()).limit(limit).offset(offset))
-    return [CompraResumenOut.model_validate(c) for c in compras]
+    por_estado = contar_por(db, q, Compra.estado)  # faceta: sin el filtro de estado
+    if estado:
+        q = q.where(Compra.estado == estado)
+    compras, total = paginar(db, q.order_by(Compra.fecha_hora.desc()), limit, offset)
+    return Pagina(items=[CompraResumenOut.model_validate(c) for c in compras], total=total, limit=limit,
+                  offset=offset, conteos={"estado": por_estado})
 
 
 def _inicio(d: date, dias: int = 0) -> datetime:

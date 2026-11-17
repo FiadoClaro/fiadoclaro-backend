@@ -54,11 +54,12 @@ def seed_demo(db) -> None:
     if not tienda:
         tienda = Tienda(ruc="20554892101", razon_social="Comercializadora Morales e Hijos S.A.C.",
                         nombre_comercial="Bodega Don Lucho", giro="Bodega", direccion="Av. Brasil 1234",
-                        distrito="Magdalena del Mar", telefono="(01) 263-8890",
+                        telefono="(01) 263-8890",
                         correo="contacto@bodegadonlucho.pe", estado="ACTIVA")
         db.add(tienda)
         db.flush()
-    get_or_create_user(db, "dlucho", "Lucho2026*", "ADMIN_TIENDA", "Luis Morales Vega", tienda.id)
+    admin = get_or_create_user(db, "dlucho", "Lucho2026*", "ADMIN_TIENDA", "Luis Morales Vega", tienda.id)
+    admin.telefono, admin.correo = admin.telefono or "984512870", admin.correo or "lucho.morales@gmail.com"
 
     for cod, nom, marca, und, contado, credito, fm, cu, mm in PRODUCTOS:
         if not db.scalar(select(Producto).where(Producto.tienda_id == tienda.id, Producto.codigo == cod)):
@@ -67,7 +68,9 @@ def seed_demo(db) -> None:
                             permite_fin_mes=fm, permite_cuotas=cu, max_meses=mm, estado="ACTIVO"))
 
     if not db.scalar(select(Cliente).where(Cliente.tienda_id == tienda.id, Cliente.dni == "08765432")):
-        u = get_or_create_user(db, "rosa.flores", "Rosa2024*Lucho", "CLIENTE", "Rosa Flores Benites", tienda.id)
+        u = get_or_create_user(db, f"08765432@{tienda.dominio_portal}", "Rosa2024*Lucho", "CLIENTE",
+                               "Rosa Flores Benites", tienda.id)
+        u.telefono, u.correo = "987654321", "rosa.flores@gmail.com"
         cliente = Cliente(tienda_id=tienda.id, usuario_id=u.id, dni="08765432", nombres="Rosa",
                           apellidos="Flores Benites", telefono="987654321", correo="rosa.flores@gmail.com",
                           estado="ACTIVO")

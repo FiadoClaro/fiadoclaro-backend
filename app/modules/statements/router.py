@@ -4,6 +4,7 @@ from typing import Literal
 from fastapi import APIRouter, Query
 
 from app.core.deps import DbSession, StoreAdmin
+from app.core.pagination import Pagina
 from app.modules.statements import service
 from app.modules.statements.schemas import EstadoCuentaOut, EstadoCuentaResumen, GeneracionOut, GenerarIn
 
@@ -21,7 +22,8 @@ def generar(body: GenerarIn, db: DbSession, actor: StoreAdmin):
     return service.generar(db, actor, body.fecha_corte, body.cliente_id)
 
 
-@router.get("", response_model=list[EstadoCuentaResumen], summary="Listar listados de pago")
+@router.get("", response_model=Pagina[EstadoCuentaResumen],
+            summary="Listar listados de pago (con total y conteos por estado)")
 def listar(
     db: DbSession,
     actor: StoreAdmin,

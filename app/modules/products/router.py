@@ -3,6 +3,7 @@ from typing import Literal
 from fastapi import APIRouter, Query, status
 
 from app.core.deps import DbSession, StoreAdmin
+from app.core.pagination import Pagina
 from app.modules.products import service
 from app.modules.products.schemas import ProductoCreate, ProductoOut, ProductoUpdate
 
@@ -15,7 +16,7 @@ def crear(body: ProductoCreate, db: DbSession, actor: StoreAdmin):
     return service.crear(db, actor, body)
 
 
-@router.get("", response_model=list[ProductoOut], summary="Listar el catálogo")
+@router.get("", response_model=Pagina[ProductoOut], summary="Listar el catálogo (con total y conteos por estado)")
 def listar(
     db: DbSession,
     actor: StoreAdmin,
