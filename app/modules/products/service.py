@@ -1,0 +1,70 @@
+from sqlalchemy import or_, select
+from sqlalchemy.orm import Session
+
+from app.core.deps import Actor
+from app.core.errors import BusinessError, ConflictError, NotFoundError
+from app.modules.audit.service import registrar
+from app.modules.products.models import Producto
+from app.modules.products.schemas import ProductoCreate, ProductoUpdate
+
+
+def obtener(db: Session, actor: Actor, producto_id: int) -> Producto:
+    p = db.get(Producto, producto_id)
+    if not p or p.tienda_id != actor.tienda_id:
+        raise NotFoundError("Producto", producto_id)
+    return p
+
+
+def _codigo_libre(db: Session, tienda_id: int, codigo: str, excepto: int | None = None) -> None:
+    q = select(Producto.id).where(Producto.tienda_id == tienda_id, Producto.codigo == codigo)
+    if excepto:
+        q = q.where(Producto.id != excepto)
+    if db.scalar(q):
+        raise ConflictError(f"Ya existe un producto con código {codigo}")
+
+
+def crear(db: Session, actor: Actor, data: ProductoCreate) -> Producto:
+    _codigo_libre(db, actor.tienda_id, data.codigo)
+    p = Producto(tienda_id=actor.tienda_id, estado="ACTIVO", **data.model_dump())
+    db.add(p)
+    db.flush()
+    registrar(db, actor, "CREAR", "producto", p.id, data.model_dump())
+    db.commit()
+    return p
+
+
+def listar(db: Session, actor: Actor, estado: str | None, q: str | None, modalidad: str | None,
+           limit: int, offset: int) -> list[Producto]:
+    stmt = select(Producto).where(Producto.tienda_id == actor.tienda_id)
+    if estado:
+        stmt = stmt.where(Producto.estado == estado)
+    if modalidad == "FIN_MES":
+        stmt = stmt.where(Producto.permite_fin_mes.is_(True))
+    elif modalidad == "CUOTAS":
+        stmt = stmt.where(Producto.permite_cuotas.is_(True))
+    if q:
+        like = f"%{q}%"
+        stmt = stmt.where(or_(Producto.nombre.ilike(like), Producto.codigo.ilike(like), Producto.marca.ilike(like)))
+    return list(db.scalars(stmt.order_by(Producto.nombre).limit(limit).offset(offset)))
+
+
+def actualizar(db: Session, actor: Actor, producto_id: int, data: ProductoUpdate) -> Producto:
+    """El cambio de precio no afecta compras anteriores: cada compra guarda su precio."""
+    p = obtener(db, actor, producto_id)
+    _codigo_libre(db, actor.tienda_id, data.codigo, excepto=p.id)
+    for k, v in data.model_dump().items():
+        setattr(p, k, v)
+    registrar(db, actor, "ACTUALIZAR", "producto", p.id, data.model_dump())
+    db.commit()
+    return p
+
+
+def cambiar_estado(db: Session, actor: Actor, producto_id: int, activar: bool) -> Producto:
+    p = obtener(db, actor, producto_id)
+    nuevo = "ACTIVO" if activar else "BAJA"
+    if p.estado == nuevo:
+        raise BusinessError(f"El producto ya está {'activo' if activar else 'dado de baja'}")
+    p.estado = nuevo
+    registrar(db, actor, "ALTA" if activar else "BAJA", "producto", p.id)
+    db.commit()
+    return p
