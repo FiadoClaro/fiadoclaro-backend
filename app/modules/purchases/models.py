@@ -1,7 +1,7 @@
 from datetime import date, datetime
 from decimal import Decimal
 
-from sqlalchemy import CheckConstraint, Date, DateTime, ForeignKey, SmallInteger, String
+from sqlalchemy import CheckConstraint, Date, DateTime, ForeignKey, ForeignKeyConstraint, SmallInteger, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.database import Base, TimestampMixin
@@ -26,6 +26,9 @@ class Compra(TimestampMixin, Base):
             "(modalidad = 'FIN_MES' AND num_cuotas = 1) OR (modalidad = 'CUOTAS' AND num_cuotas >= 1)",
             name="cuotas_segun_modalidad",
         ),
+        # El cliente de la compra siempre pertenece a la misma tienda de la compra.
+        ForeignKeyConstraint(["cliente_id", "tienda_id"], ["cliente.id", "cliente.tienda_id"],
+                             name="fk_compra_cliente_tienda"),
     )
 
     id: Mapped[int] = mapped_column(primary_key=True)

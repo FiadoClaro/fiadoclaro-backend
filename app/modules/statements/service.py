@@ -2,8 +2,9 @@
 Listado de pago generado en la fecha de corte (enunciado, punto 6).
 
 Incluye las compras del ciclo ordenadas por fecha, con los intereses por los días entre
-la compra y la fecha de pago. Si se paga tarde, la mora se detalla en un ítem aparte:
-interés moratorio sobre el pago total que debió hacerse, por los días de atraso.
+la compra y la fecha de pago. Si se paga tarde, se agregan dos ítems aparte:
+  * interés moratorio sobre el pago total que debió hacerse, con la tasa moratoria del listado;
+  * interés compensatorio por los mismos días de atraso.
 """
 from dataclasses import dataclass
 from datetime import date, datetime
@@ -37,17 +38,30 @@ CERO = Decimal("0")
 @dataclass
 class Mora:
     dias: int
-    monto: Decimal
+    moratorio: Decimal      # interés moratorio (penalidad)
+    comp_mora: Decimal      # interés compensatorio por los días de atraso
+
+    @property
+    def total(self) -> Decimal:
+        return engine.dinero(self.moratorio + self.comp_mora)
 
 
 def calcular_mora(ec: EstadoCuenta, fecha_pago_real: date) -> Mora:
-    """Mora de cada cuota con la tasa moratoria COPIADA en su compra."""
-    dias_max, total = 0, CERO
+    """
+    Si se paga después de la fecha de pago del listado:
+      * Interés moratorio: sobre el PAGO TOTAL del listado, con UNA sola tasa moratoria
+        (la copiada en el listado el día del corte), por los días de atraso (punto 6).
+      * Interés compensatorio por atraso: el dinero se sigue usando, así que cada línea sigue
+        generando su compensatorio con la tasa COPIADA en su compra (punto 5).
+    """
+    r = engine.interes_moratorio(ec.total_a_pagar, ec.fecha_pago, fecha_pago_real, ec.tasa_moratoria)
+    if r.dias_mora == 0:
+        return Mora(0, CERO, CERO)
+    comp = CERO
     for c in ec.cuotas:
-        _, t_mora = tasas_de_compra(c.compra)
-        r = engine.interes_moratorio(c.cuota, c.fecha_vencimiento, fecha_pago_real, t_mora)
-        dias_max, total = max(dias_max, r.dias_mora), total + r.interes_moratorio
-    return Mora(dias_max, engine.dinero(total))
+        t_comp, _ = tasas_de_compra(c.compra)
+        comp += engine.interes_compensatorio_mora(c.cuota, ec.fecha_pago, fecha_pago_real, t_comp)
+    return Mora(r.dias_mora, r.interes_moratorio, engine.dinero(comp))
 
 
 # --------------------------------------------------------------- generación
@@ -80,8 +94,12 @@ def _generar_para(db: Session, actor: Actor, cliente: Cliente, fecha_corte: date
         return "Sin deuda que vence en este ciclo"
 
     if not ec:
+        # Copia de la tasa moratoria vigente al corte: un cambio posterior en el cliente no altera el listado.
         ec = EstadoCuenta(tienda_id=cliente.tienda_id, cliente_id=cliente.id, fecha_corte=fecha_corte,
                           fecha_pago=fecha_pago, moneda=cond.moneda, estado="PENDIENTE",
+                          tipo_tasa_mora=cond.tipo_tasa_mora, tasa_mora=cond.tasa_mora,
+                          periodo_tasa_mora_dias=cond.periodo_tasa_mora_dias,
+                          capitalizacion_mora_dias=cond.capitalizacion_mora_dias,
                           total_capital=CERO, total_interes=CERO, total_a_pagar=CERO)
         db.add(ec)
         db.flush()
@@ -157,23 +175,32 @@ def detalle(db: Session, ec: EstadoCuenta, fecha_consulta: date | None = None) -
 
     if ec.estado == "PAGADO":
         pago = db.scalar(select(Pago).where(Pago.estado_cuenta_id == ec.id))
-        mora = Mora(pago.dias_mora, pago.monto_mora)
+        mora = Mora(pago.dias_mora, pago.monto_mora, pago.monto_interes_comp_mora)
         fecha_consulta = pago.fecha_pago
     else:
         mora = calcular_mora(ec, fecha_consulta)
 
-    if mora.monto > 0:
+    # Punto 6: la mora se detalla en ítems nuevos, después de las compras.
+    if mora.moratorio > 0:
         items.append(ItemListado(
             tipo="INTERES_MORA", compra_id=None, fecha_compra=None,
-            descripcion=f"Intereses por mora ({mora.dias} días de atraso)",
-            fecha_vencimiento=ec.fecha_pago, capital=CERO, interes=CERO, mora=mora.monto, total=mora.monto,
+            descripcion=f"Intereses por mora ({mora.dias} días de atraso, tasa moratoria {ec.tasa_mora.normalize():f} %)",
+            fecha_vencimiento=ec.fecha_pago, capital=CERO, interes=CERO, mora=mora.moratorio,
+            dias_interes=mora.dias, total=mora.moratorio,
+        ))
+    if mora.comp_mora > 0:
+        items.append(ItemListado(
+            tipo="INTERES_COMP_MORA", compra_id=None, fecha_compra=None,
+            descripcion=f"Interés compensatorio por los {mora.dias} días de atraso",
+            fecha_vencimiento=ec.fecha_pago, capital=CERO, interes=mora.comp_mora,
+            dias_interes=mora.dias, total=mora.comp_mora,
         ))
 
     base = _resumen(ec, cliente)
     return EstadoCuentaOut(
         **base.model_dump(), items=items, total_capital=ec.total_capital, total_interes=ec.total_interes,
-        fecha_consulta=fecha_consulta, dias_mora=mora.dias, interes_moratorio=mora.monto,
-        total_exigible=engine.dinero(ec.total_a_pagar + mora.monto),
+        fecha_consulta=fecha_consulta, dias_mora=mora.dias, interes_moratorio=mora.moratorio,
+        interes_compensatorio_mora=mora.comp_mora, total_exigible=engine.dinero(ec.total_a_pagar + mora.total),
     )
 
 

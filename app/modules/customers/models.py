@@ -14,6 +14,8 @@ class Cliente(TimestampMixin, Base):
     __tablename__ = "cliente"
     __table_args__ = (
         UniqueConstraint("tienda_id", "dni", name="uq_cliente_tienda_dni"),
+        # Soporte de las FK compuestas (cliente_id, tienda_id) de compra, estado_cuenta y pago.
+        UniqueConstraint("id", "tienda_id", name="uq_cliente_id_tienda"),
         CheckConstraint("dni ~ '^[0-9]{8}$'", name="dni_8_digitos"),
         CheckConstraint("estado IN ('ACTIVO', 'BAJA')", name="estado_valido"),
     )

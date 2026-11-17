@@ -1,8 +1,8 @@
 """esquema inicial
 
-Revision ID: 355547824833
+Revision ID: 731dc787aaee
 Revises: 
-Create Date: 2026-11-17 00:58:40.040300
+Create Date: 2026-11-17 15:14:45.820396
 
 """
 from typing import Sequence, Union
@@ -12,7 +12,7 @@ import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
 
 # revision identifiers, used by Alembic.
-revision: str = '355547824833'
+revision: str = '731dc787aaee'
 down_revision: Union[str, Sequence[str], None] = None
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
@@ -136,6 +136,7 @@ def upgrade() -> None:
     sa.ForeignKeyConstraint(['tienda_id'], ['tienda.id'], name=op.f('fk_cliente_tienda_id_tienda')),
     sa.ForeignKeyConstraint(['usuario_id'], ['usuario.id'], name=op.f('fk_cliente_usuario_id_usuario')),
     sa.PrimaryKeyConstraint('id', name=op.f('pk_cliente')),
+    sa.UniqueConstraint('id', 'tienda_id', name='uq_cliente_id_tienda'),
     sa.UniqueConstraint('tienda_id', 'dni', name='uq_cliente_tienda_dni'),
     sa.UniqueConstraint('usuario_id', name=op.f('uq_cliente_usuario_id'))
     )
@@ -177,6 +178,7 @@ def upgrade() -> None:
     sa.CheckConstraint("tipo_tasa IN ('NOMINAL', 'EFECTIVA')", name=op.f('ck_compra_tipo_tasa_valido')),
     sa.CheckConstraint("tipo_tasa_mora IN ('NOMINAL', 'EFECTIVA')", name=op.f('ck_compra_tipo_tasa_mora_valido')),
     sa.CheckConstraint('monto_total > 0', name=op.f('ck_compra_monto_positivo')),
+    sa.ForeignKeyConstraint(['cliente_id', 'tienda_id'], ['cliente.id', 'cliente.tienda_id'], name='fk_compra_cliente_tienda'),
     sa.ForeignKeyConstraint(['cliente_id'], ['cliente.id'], name=op.f('fk_compra_cliente_id_cliente')),
     sa.ForeignKeyConstraint(['registrado_por'], ['usuario.id'], name=op.f('fk_compra_registrado_por_usuario')),
     sa.ForeignKeyConstraint(['tienda_id'], ['tienda.id'], name=op.f('fk_compra_tienda_id_tienda')),
@@ -220,12 +222,18 @@ def upgrade() -> None:
     sa.Column('fecha_corte', sa.Date(), nullable=False),
     sa.Column('fecha_pago', sa.Date(), nullable=False),
     sa.Column('moneda', sa.String(length=3), nullable=False),
+    sa.Column('tipo_tasa_mora', sa.String(length=10), nullable=False),
+    sa.Column('tasa_mora', sa.Numeric(precision=12, scale=7), nullable=False),
+    sa.Column('periodo_tasa_mora_dias', sa.SmallInteger(), nullable=False),
+    sa.Column('capitalizacion_mora_dias', sa.SmallInteger(), nullable=True),
     sa.Column('total_capital', sa.Numeric(precision=12, scale=2), nullable=False),
     sa.Column('total_interes', sa.Numeric(precision=12, scale=2), nullable=False),
     sa.Column('total_a_pagar', sa.Numeric(precision=12, scale=2), nullable=False),
     sa.Column('estado', sa.String(length=10), nullable=False),
     sa.Column('generado_en', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
     sa.CheckConstraint("estado IN ('PENDIENTE', 'PAGADO')", name=op.f('ck_estado_cuenta_estado_valido')),
+    sa.CheckConstraint("tipo_tasa_mora IN ('NOMINAL', 'EFECTIVA')", name=op.f('ck_estado_cuenta_tipo_tasa_mora_valido')),
+    sa.ForeignKeyConstraint(['cliente_id', 'tienda_id'], ['cliente.id', 'cliente.tienda_id'], name='fk_estado_cuenta_cliente_tienda'),
     sa.ForeignKeyConstraint(['cliente_id'], ['cliente.id'], name=op.f('fk_estado_cuenta_cliente_id_cliente')),
     sa.ForeignKeyConstraint(['tienda_id'], ['tienda.id'], name=op.f('fk_estado_cuenta_tienda_id_tienda')),
     sa.PrimaryKeyConstraint('id', name=op.f('pk_estado_cuenta')),
@@ -276,12 +284,14 @@ def upgrade() -> None:
     sa.Column('fecha_pago', sa.Date(), nullable=False),
     sa.Column('dias_mora', sa.SmallInteger(), nullable=False),
     sa.Column('monto_mora', sa.Numeric(precision=12, scale=2), nullable=False),
+    sa.Column('monto_interes_comp_mora', sa.Numeric(precision=12, scale=2), nullable=False),
     sa.Column('monto_interes', sa.Numeric(precision=12, scale=2), nullable=False),
     sa.Column('monto_capital', sa.Numeric(precision=12, scale=2), nullable=False),
     sa.Column('monto_total', sa.Numeric(precision=12, scale=2), nullable=False),
     sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
     sa.CheckConstraint('dias_mora >= 0', name=op.f('ck_pago_dias_mora_no_negativos')),
-    sa.CheckConstraint('monto_total = monto_mora + monto_interes + monto_capital', name=op.f('ck_pago_imputacion_cuadra')),
+    sa.CheckConstraint('monto_total = monto_mora + monto_interes_comp_mora + monto_interes + monto_capital', name=op.f('ck_pago_imputacion_cuadra')),
+    sa.ForeignKeyConstraint(['cliente_id', 'tienda_id'], ['cliente.id', 'cliente.tienda_id'], name='fk_pago_cliente_tienda'),
     sa.ForeignKeyConstraint(['cliente_id'], ['cliente.id'], name=op.f('fk_pago_cliente_id_cliente')),
     sa.ForeignKeyConstraint(['estado_cuenta_id'], ['estado_cuenta.id'], name=op.f('fk_pago_estado_cuenta_id_estado_cuenta')),
     sa.ForeignKeyConstraint(['registrado_por'], ['usuario.id'], name=op.f('fk_pago_registrado_por_usuario')),

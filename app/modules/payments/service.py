@@ -2,8 +2,10 @@
 Pago de un listado (enunciado, puntos 5 y 6; Anexo A).
 
 * No se aceptan pagos parciales: el monto debe ser igual al total exigible.
-* Si se paga después de la fecha pactada, se suma el interés moratorio.
-* El pago se imputa por prelación: 1) mora, 2) interés compensatorio, 3) capital.
+* Si se paga después de la fecha pactada, se suman el interés moratorio y el
+  interés compensatorio por los días de atraso.
+* El pago se imputa por prelación: 1) mora, 2) compensatorio por atraso,
+  3) compensatorio del listado, 4) capital.
 """
 from datetime import date
 
@@ -36,11 +38,12 @@ def cotizar(db: Session, actor: Actor, ec_id: int, fecha: date | None) -> Cotiza
     statements.validar_pendiente(ec)
     fecha = _fecha_valida(ec, fecha)
     mora = statements.calcular_mora(ec, fecha)
-    total = engine.dinero(ec.total_a_pagar + mora.monto)
-    prelacion = engine.aplicar_prelacion(total, mora.monto, ec.total_interes, ec.total_capital)
+    total = engine.dinero(ec.total_a_pagar + mora.total)
+    prelacion = engine.aplicar_prelacion(total, mora.moratorio, mora.comp_mora, ec.total_interes, ec.total_capital)
     return CotizacionOut(
         estado_cuenta_id=ec.id, fecha_pago_pactada=ec.fecha_pago, fecha_pago=fecha, dias_mora=mora.dias,
-        interes_moratorio=mora.monto, interes_compensatorio=ec.total_interes, capital=ec.total_capital,
+        interes_moratorio=mora.moratorio, interes_compensatorio_mora=mora.comp_mora,
+        interes_compensatorio=ec.total_interes, capital=ec.total_capital,
         total_exigible=total, prelacion=[ImputacionOut(**i.__dict__) for i in prelacion],
     )
 
@@ -50,7 +53,8 @@ def registrar_pago(db: Session, actor: Actor, data: PagoIn) -> PagoOut:
     if data.monto != cot.total_exigible:
         raise BusinessError(
             f"No se aceptan pagos parciales: el total exigible al {cot.fecha_pago} es "
-            f"{cot.total_exigible} (incluye {cot.interes_moratorio} de mora)",
+            f"{cot.total_exigible} (incluye {cot.interes_moratorio} de mora y "
+            f"{cot.interes_compensatorio_mora} de interés compensatorio por atraso)",
             code="monto_distinto_al_exigible",
         )
     ec = statements.obtener(db, actor, data.estado_cuenta_id)
@@ -58,6 +62,7 @@ def registrar_pago(db: Session, actor: Actor, data: PagoIn) -> PagoOut:
     pago = Pago(
         tienda_id=ec.tienda_id, cliente_id=ec.cliente_id, estado_cuenta_id=ec.id, registrado_por=actor.id,
         fecha_pago=cot.fecha_pago, dias_mora=cot.dias_mora, monto_mora=imp["INTERES_MORATORIO"],
+        monto_interes_comp_mora=imp["INTERES_COMPENSATORIO_MORA"],
         monto_interes=imp["INTERES_COMPENSATORIO"], monto_capital=imp["CAPITAL"], monto_total=data.monto,
     )
     db.add(pago)
@@ -76,7 +81,8 @@ def registrar_pago(db: Session, actor: Actor, data: PagoIn) -> PagoOut:
 
     registrar(db, actor, "PAGO", "estado_cuenta", ec.id, {
         "pago_id": pago.id, "fecha_pago": cot.fecha_pago, "dias_mora": cot.dias_mora,
-        "mora": pago.monto_mora, "interes": pago.monto_interes, "capital": pago.monto_capital,
+        "mora": pago.monto_mora, "interes_comp_mora": pago.monto_interes_comp_mora,
+        "interes": pago.monto_interes, "capital": pago.monto_capital,
         "total": pago.monto_total,
     })
     db.commit()
@@ -85,7 +91,8 @@ def registrar_pago(db: Session, actor: Actor, data: PagoIn) -> PagoOut:
 
 
 def to_out(p: Pago) -> PagoOut:
-    imput = engine.aplicar_prelacion(p.monto_total, p.monto_mora, p.monto_interes, p.monto_capital)
+    imput = engine.aplicar_prelacion(p.monto_total, p.monto_mora, p.monto_interes_comp_mora,
+                                     p.monto_interes, p.monto_capital)
     return PagoOut(
         id=p.id, estado_cuenta_id=p.estado_cuenta_id, cliente_id=p.cliente_id, fecha_pago=p.fecha_pago,
         dias_mora=p.dias_mora, monto_total=p.monto_total, created_at=p.created_at,

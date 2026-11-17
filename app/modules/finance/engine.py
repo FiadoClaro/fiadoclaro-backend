@@ -4,7 +4,7 @@ Motor financiero de FiadoClaro (Python puro, sin base de datos ni FastAPI).
 Convenciones del Anexo A del enunciado:
   * Año comercial de 360 días y mes comercial de 30 días.
   * Conversión explícita de tasa nominal a efectiva.
-  * Prelación de pagos: mora -> interés compensatorio -> capital.
+  * Prelación de pagos: mora -> interés compensatorio (por atraso y del listado) -> capital.
   * Montos redondeados a 2 decimales; tasas con al menos 7 decimales
     (internamente se trabaja con 34 dígitos significativos y se guardan 10 decimales).
 
@@ -294,15 +294,34 @@ class ResultadoMora:
     interes_moratorio: Decimal
 
 
+def dias_mora(fecha_vencimiento: date, fecha_pago_real: date) -> int:
+    """Días de atraso: fecha real de pago − fecha de pago pactada (0 si pagó a tiempo)."""
+    return max(0, dias_entre(fecha_vencimiento, fecha_pago_real))
+
+
 def interes_moratorio(base: Decimal, fecha_vencimiento: date, fecha_pago_real: date, t_mora: Tasa) -> ResultadoMora:
     """
     Interés moratorio sobre el pago total que debió hacerse en la fecha pactada,
     por los días transcurridos de mora (punto 6).
+        IM = base × [(1 + TEP_mora)^(días de mora) − 1]
     """
-    dias = max(0, dias_entre(fecha_vencimiento, fecha_pago_real))
+    dias = dias_mora(fecha_vencimiento, fecha_pago_real)
     if dias == 0:
         return ResultadoMora(0, CERO)
     return ResultadoMora(dias, dinero(D(base) * tasa_efectiva_periodo(t_mora, dias)))
+
+
+def interes_compensatorio_mora(base: Decimal, fecha_vencimiento: date, fecha_pago_real: date, t_comp: Tasa) -> Decimal:
+    """
+    Interés compensatorio por los días de atraso (punto 5: "también se deberá pagar intereses
+    por los días en exceso"). El dinero se sigue usando durante la mora, así que el compensatorio
+    sigue corriendo; el moratorio se suma aparte como penalidad.
+        IC_mora = base × [(1 + TEP_comp)^(días de mora) − 1]
+    """
+    dias = dias_mora(fecha_vencimiento, fecha_pago_real)
+    if dias == 0:
+        return CERO
+    return dinero(D(base) * tasa_efectiva_periodo(t_comp, dias))
 
 
 # ---------------------------------------------------------------- prelación
@@ -315,13 +334,25 @@ class Imputacion:
     saldo: Decimal
 
 
-def aplicar_prelacion(monto_pagado: Decimal, mora: Decimal, interes: Decimal, capital: Decimal) -> list[Imputacion]:
-    """Aplica un pago en orden: 1) mora, 2) interés compensatorio, 3) capital."""
+def aplicar_prelacion(
+    monto_pagado: Decimal, mora: Decimal, interes_comp_mora: Decimal, interes: Decimal, capital: Decimal
+) -> list[Imputacion]:
+    """
+    Aplica un pago en orden (Anexo A: mora -> interés compensatorio -> capital):
+      1) interés moratorio
+      2) interés compensatorio por los días de atraso
+      3) interés compensatorio del listado
+      4) capital
+    """
     restante = D(monto_pagado)
     resultado: list[Imputacion] = []
-    for orden, (concepto, exigible) in enumerate(
-        (("INTERES_MORATORIO", D(mora)), ("INTERES_COMPENSATORIO", D(interes)), ("CAPITAL", D(capital))), start=1
-    ):
+    conceptos = (
+        ("INTERES_MORATORIO", D(mora)),
+        ("INTERES_COMPENSATORIO_MORA", D(interes_comp_mora)),
+        ("INTERES_COMPENSATORIO", D(interes)),
+        ("CAPITAL", D(capital)),
+    )
+    for orden, (concepto, exigible) in enumerate(conceptos, start=1):
         imputado = min(restante, exigible)
         restante -= imputado
         resultado.append(Imputacion(orden, concepto, exigible, imputado, exigible - imputado))

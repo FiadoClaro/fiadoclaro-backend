@@ -20,7 +20,8 @@ class CotizacionOut(BaseModel):
     fecha_pago: date
     dias_mora: int
     interes_moratorio: Decimal
-    interes_compensatorio: Decimal
+    interes_compensatorio_mora: Decimal = Field(description="Compensatorio por los días de atraso")
+    interes_compensatorio: Decimal = Field(description="Compensatorio del listado (compra -> fecha de pago)")
     capital: Decimal
     total_exigible: Decimal
     prelacion: list[ImputacionOut]

@@ -11,7 +11,7 @@ class GenerarIn(BaseModel):
 
 
 class ItemListado(BaseModel):
-    tipo: Literal["COMPRA_FIN_MES", "CUOTA", "INTERES_MORA"]
+    tipo: Literal["COMPRA_FIN_MES", "CUOTA", "INTERES_MORA", "INTERES_COMP_MORA"]
     compra_id: int | None
     fecha_compra: datetime | None
     descripcion: str
@@ -19,7 +19,8 @@ class ItemListado(BaseModel):
     fecha_vencimiento: date
     capital: Decimal
     interes: Decimal = Field(description="Interés compensatorio")
-    dias_interes: int | None = Field(None, description="Días entre la compra y la fecha de pago (fin de mes)")
+    dias_interes: int | None = Field(
+        None, description="Días entre la compra y la fecha de pago (fin de mes) o días de atraso (ítems de mora)")
     mora: Decimal = Decimal("0.00")
     total: Decimal
 
@@ -44,6 +45,7 @@ class EstadoCuentaOut(EstadoCuentaResumen):
     fecha_consulta: date
     dias_mora: int
     interes_moratorio: Decimal
+    interes_compensatorio_mora: Decimal = Field(description="Compensatorio por los días de atraso")
     total_exigible: Decimal = Field(description="Total a pagar a la fecha de consulta (incluye mora)")
 
 
