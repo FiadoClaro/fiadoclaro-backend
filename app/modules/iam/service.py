@@ -18,10 +18,25 @@ class LoginInvalido(BusinessError):
         super().__init__(msg, code=code)
 
 
+class UsuarioNoExiste(BusinessError):
+    status_code = 404
+
+    def __init__(self, username: str):
+        super().__init__(f"El usuario '{username}' no existe", code="usuario_no_existe")
+
+
 def login(db: Session, username: str, password: str, ip: str | None) -> tuple[str, Usuario]:
-    usuario = db.scalar(select(Usuario).where(Usuario.username == username.strip().lower()))
-    if not usuario or not verify_password(password, usuario.password_hash):
-        raise LoginInvalido()
+    """
+    Mensajes distintos para "usuario no existe" (404) y "contraseña incorrecta" (401), a pedido del equipo.
+    Nota de seguridad: esto permite averiguar qué usuarios existen. Para volver a un mensaje genérico,
+    lanzar LoginInvalido() en ambos casos.
+    """
+    username = username.strip().lower()
+    usuario = db.scalar(select(Usuario).where(Usuario.username == username))
+    if not usuario:
+        raise UsuarioNoExiste(username)
+    if not verify_password(password, usuario.password_hash):
+        raise LoginInvalido("La contraseña es incorrecta", "password_incorrecto")
     if not usuario.activo:
         raise LoginInvalido("Tu usuario está desactivado. Comunícate con la tienda.", "usuario_inactivo")
     if usuario.tienda_id is not None:

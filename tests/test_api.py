@@ -47,10 +47,16 @@ def test_sin_sesion(api):
     assert r.status_code == 401 and r.json()["code"] == "no_autenticado"
 
 
-def test_login_incorrecto(api, con_claves):
+def test_login_contrasena_incorrecta(api, con_claves):
     r = api.post(f"{API}/iam/login", data={"username": "admin.test", "password": "mala"})
     assert r.status_code == 401
-    assert r.json() == {"detail": "Usuario o contraseña incorrectos", "code": "login_invalido"}
+    assert r.json() == {"detail": "La contraseña es incorrecta", "code": "password_incorrecto"}
+
+
+def test_login_usuario_que_no_existe(api, con_claves):
+    r = api.post(f"{API}/iam/login", data={"username": "No.Existe", "password": "loquesea"})
+    assert r.status_code == 404
+    assert r.json() == {"detail": "El usuario 'no.existe' no existe", "code": "usuario_no_existe"}
 
 
 def test_rol_sin_permiso(api, h_cliente):

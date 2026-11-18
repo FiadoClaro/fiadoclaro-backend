@@ -8,8 +8,7 @@ Acceso y perfil del usuario de la sesión.
 """
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Request, status
-from fastapi.security import OAuth2PasswordRequestForm
+from fastapi import APIRouter, Form, Request, status
 
 from app.core.deps import CurrentActor, DbSession, StoreAdmin
 from app.modules.iam import service
@@ -21,8 +20,14 @@ router = APIRouter(prefix="/iam", tags=["IAM - Acceso y perfil"])
 
 
 @router.post("/login", response_model=TokenOut, summary="Iniciar sesión (usuario y contraseña)")
-def login(request: Request, db: DbSession, form: Annotated[OAuth2PasswordRequestForm, Depends()]):
-    token, usuario = service.login(db, form.username, form.password, request.client.host if request.client else None)
+def login(
+    request: Request,
+    db: DbSession,
+    username: Annotated[str, Form(description="Usuario o correo, ej. dlucho o 08765432@bodegadonlucho.com")],
+    password: Annotated[str, Form(description="Contraseña")],
+):
+    """Solo pide usuario y contraseña. Devuelve el token para el encabezado `Authorization: Bearer <token>`."""
+    token, usuario = service.login(db, username, password, request.client.host if request.client else None)
     return TokenOut(access_token=token, usuario=UsuarioOut.model_validate(usuario))
 
 
