@@ -22,7 +22,7 @@ def listar(
     actor: StoreAdmin,
     estado: Literal["ACTIVO", "BAJA"] | None = None,
     modalidad: Literal["FIN_MES", "CUOTAS"] | None = None,
-    q: str | None = Query(None, description="Busca por nombre, código o marca"),
+    q: str | None = Query(None, description="Busca por nombre, marca o proveedor"),
     limit: int = Query(50, ge=1, le=200),
     offset: int = Query(0, ge=0),
 ):

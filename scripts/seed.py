@@ -23,12 +23,12 @@ TOPES = [
 ]
 
 PRODUCTOS = [
-    # codigo, nombre, marca, unidad, contado, credito, fin_mes, cuotas, max_meses
-    ("SKU-00104", "Pollo fresco eviscerado", "San Fernando", "Kilo (kg)", "9.80", "10.50", True, False, None),
-    ("SKU-00218", "Pan francés artesanal", "Panadería Don Lucho", "Unidad", "0.40", "0.45", True, False, None),
-    ("SKU-00340", "Gaseosa Inca Kola 1.5 L", "Inca Kola", "Botella 1.5 L", "7.50", "8.20", True, False, None),
-    ("SKU-00412", "Arroz Costeño Extra 5 kg", "Costeño", "Bolsa 5 kg", "22.00", "24.50", True, True, 3),
-    ("SKU-00500", "Leche Gloria Azul 400g", "Gloria", "Unidad", "4.20", "4.60", True, False, None),
+    # nombre, marca, unidad, contado, credito, fin_mes, cuotas, max_meses
+    ("Pollo fresco eviscerado", "San Fernando", "Kilo (kg)", "9.80", "10.50", True, False, None),
+    ("Pan francés artesanal", "Panadería Don Lucho", "Unidad", "0.40", "0.45", True, False, None),
+    ("Gaseosa Inca Kola 1.5 L", "Inca Kola", "Botella 1.5 L", "7.50", "8.20", True, False, None),
+    ("Arroz Costeño Extra 5 kg", "Costeño", "Bolsa 5 kg", "22.00", "24.50", True, True, 3),
+    ("Leche Gloria Azul 400g", "Gloria", "Unidad", "4.20", "4.60", True, False, None),
 ]
 
 
@@ -61,9 +61,9 @@ def seed_demo(db) -> None:
     admin = get_or_create_user(db, "dlucho", "Lucho2026*", "ADMIN_TIENDA", "Luis Morales Vega", tienda.id)
     admin.telefono, admin.correo = admin.telefono or "984512870", admin.correo or "lucho.morales@gmail.com"
 
-    for cod, nom, marca, und, contado, credito, fm, cu, mm in PRODUCTOS:
-        if not db.scalar(select(Producto).where(Producto.tienda_id == tienda.id, Producto.codigo == cod)):
-            db.add(Producto(tienda_id=tienda.id, codigo=cod, nombre=nom, marca=marca, unidad_medida=und,
+    for nom, marca, und, contado, credito, fm, cu, mm in PRODUCTOS:
+        if not db.scalar(select(Producto).where(Producto.tienda_id == tienda.id, Producto.nombre == nom)):
+            db.add(Producto(tienda_id=tienda.id, nombre=nom, marca=marca, unidad_medida=und,
                             moneda="PEN", precio_contado=D(contado), precio_lista_credito=D(credito),
                             permite_fin_mes=fm, permite_cuotas=cu, max_meses=mm, estado="ACTIVO"))
 

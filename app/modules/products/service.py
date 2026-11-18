@@ -2,7 +2,7 @@ from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
 
 from app.core.deps import Actor
-from app.core.errors import BusinessError, ConflictError, NotFoundError
+from app.core.errors import BusinessError, NotFoundError
 from app.core.pagination import Pagina, contar_por, paginar
 from app.modules.audit.service import registrar
 from app.modules.products.models import Producto
@@ -16,16 +16,7 @@ def obtener(db: Session, actor: Actor, producto_id: int) -> Producto:
     return p
 
 
-def _codigo_libre(db: Session, tienda_id: int, codigo: str, excepto: int | None = None) -> None:
-    q = select(Producto.id).where(Producto.tienda_id == tienda_id, Producto.codigo == codigo)
-    if excepto:
-        q = q.where(Producto.id != excepto)
-    if db.scalar(q):
-        raise ConflictError(f"Ya existe un producto con código {codigo}")
-
-
 def crear(db: Session, actor: Actor, data: ProductoCreate) -> Producto:
-    _codigo_libre(db, actor.tienda_id, data.codigo)
     p = Producto(tienda_id=actor.tienda_id, estado="ACTIVO", **data.model_dump())
     db.add(p)
     db.flush()
@@ -43,7 +34,7 @@ def listar(db: Session, actor: Actor, estado: str | None, q: str | None, modalid
         stmt = stmt.where(Producto.permite_cuotas.is_(True))
     if q:
         like = f"%{q}%"
-        stmt = stmt.where(or_(Producto.nombre.ilike(like), Producto.codigo.ilike(like), Producto.marca.ilike(like)))
+        stmt = stmt.where(or_(Producto.nombre.ilike(like), Producto.marca.ilike(like), Producto.proveedor.ilike(like)))
     por_estado = contar_por(db, stmt, Producto.estado)  # faceta: sin el filtro de estado
     if estado:
         stmt = stmt.where(Producto.estado == estado)
@@ -55,7 +46,6 @@ def listar(db: Session, actor: Actor, estado: str | None, q: str | None, modalid
 def actualizar(db: Session, actor: Actor, producto_id: int, data: ProductoUpdate) -> Producto:
     """El cambio de precio no afecta compras anteriores: cada compra guarda su precio."""
     p = obtener(db, actor, producto_id)
-    _codigo_libre(db, actor.tienda_id, data.codigo, excepto=p.id)
     for k, v in data.model_dump().items():
         setattr(p, k, v)
     registrar(db, actor, "ACTUALIZAR", "producto", p.id, data.model_dump())

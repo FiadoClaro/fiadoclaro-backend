@@ -10,6 +10,8 @@ from app.core.errors import NotFoundError
 from app.modules.customers import service as customers
 from app.modules.customers.models import Cliente
 from app.modules.customers.schemas import ClienteOut
+from app.modules.portal import service as portal
+from app.modules.portal.schemas import PortalResumenOut
 from app.modules.purchases import service as purchases
 from app.modules.purchases.models import Compra
 from app.modules.purchases.schemas import CompraOut, CompraResumenOut
@@ -24,7 +26,14 @@ def _mi_cliente(db, actor) -> Cliente:
     cliente = db.scalar(select(Cliente).where(Cliente.usuario_id == actor.id))
     if not cliente:
         raise NotFoundError("Cliente")
+    statements.asegurar_listados(db, cliente.tienda_id, cliente.id)  # listados de los cortes ya pasados
     return cliente
+
+
+@router.get("/resumen", response_model=PortalResumenOut,
+            summary="Mi estado de cuenta: saldo, mora, próxima fecha, compras y cuotas (todo calculado)")
+def mi_resumen(db: DbSession, actor: CustomerUser):
+    return portal.resumen(db, _mi_cliente(db, actor))
 
 
 @router.get("/me", response_model=ClienteOut, summary="Mis datos, condiciones y crédito disponible")

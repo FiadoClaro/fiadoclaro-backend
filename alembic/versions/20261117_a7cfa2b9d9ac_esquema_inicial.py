@@ -1,8 +1,8 @@
 """esquema inicial
 
-Revision ID: b804b4d207b4
+Revision ID: a7cfa2b9d9ac
 Revises: 
-Create Date: 2026-11-17 18:24:39.045112
+Create Date: 2026-11-17 19:21:40.998752
 
 """
 from typing import Sequence, Union
@@ -12,7 +12,7 @@ import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
 
 # revision identifiers, used by Alembic.
-revision: str = 'b804b4d207b4'
+revision: str = 'a7cfa2b9d9ac'
 down_revision: Union[str, Sequence[str], None] = None
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
@@ -55,7 +55,6 @@ def upgrade() -> None:
     op.create_table('producto',
     sa.Column('id', sa.Integer(), nullable=False),
     sa.Column('tienda_id', sa.Integer(), nullable=False),
-    sa.Column('codigo', sa.String(length=30), nullable=False),
     sa.Column('nombre', sa.String(length=120), nullable=False),
     sa.Column('descripcion', sa.String(length=300), nullable=True),
     sa.Column('marca', sa.String(length=60), nullable=True),
@@ -77,8 +76,7 @@ def upgrade() -> None:
     sa.CheckConstraint('permite_fin_mes OR permite_cuotas', name=op.f('ck_producto_alguna_modalidad')),
     sa.CheckConstraint('precio_contado > 0 AND precio_lista_credito > 0', name=op.f('ck_producto_precios_positivos')),
     sa.ForeignKeyConstraint(['tienda_id'], ['tienda.id'], name=op.f('fk_producto_tienda_id_tienda')),
-    sa.PrimaryKeyConstraint('id', name=op.f('pk_producto')),
-    sa.UniqueConstraint('tienda_id', 'codigo', name='uq_producto_tienda_codigo')
+    sa.PrimaryKeyConstraint('id', name=op.f('pk_producto'))
     )
     op.create_index(op.f('ix_producto_tienda_id'), 'producto', ['tienda_id'], unique=False)
     op.create_table('usuario',

@@ -1,6 +1,6 @@
 from decimal import Decimal
 
-from sqlalchemy import Boolean, CheckConstraint, ForeignKey, SmallInteger, String, UniqueConstraint
+from sqlalchemy import Boolean, CheckConstraint, ForeignKey, SmallInteger, String
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.core.database import Base, TimestampMixin
@@ -12,7 +12,6 @@ class Producto(TimestampMixin, Base):
 
     __tablename__ = "producto"
     __table_args__ = (
-        UniqueConstraint("tienda_id", "codigo", name="uq_producto_tienda_codigo"),
         CheckConstraint(check_in("moneda", MONEDAS), name="moneda_valida"),
         CheckConstraint("precio_contado > 0 AND precio_lista_credito > 0", name="precios_positivos"),
         CheckConstraint("permite_fin_mes OR permite_cuotas", name="alguna_modalidad"),
@@ -25,7 +24,6 @@ class Producto(TimestampMixin, Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     tienda_id: Mapped[int] = mapped_column(ForeignKey("tienda.id"), index=True)
-    codigo: Mapped[str] = mapped_column(String(30))  # SKU
     nombre: Mapped[str] = mapped_column(String(120))
     descripcion: Mapped[str | None] = mapped_column(String(300))
     marca: Mapped[str | None] = mapped_column(String(60))

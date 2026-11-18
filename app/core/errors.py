@@ -54,7 +54,7 @@ NOMBRES_CAMPO = {
     "password_nueva": "La nueva contraseña", "nombre": "El nombre", "nombres": "Los nombres",
     "apellidos": "Los apellidos", "dni": "El DNI", "ruc": "El RUC", "telefono": "El teléfono",
     "correo": "El correo", "direccion": "La dirección", "razon_social": "La razón social",
-    "nombre_comercial": "El nombre comercial", "giro": "El giro", "codigo": "El código",
+    "nombre_comercial": "El nombre comercial", "giro": "El giro",
     "unidad_medida": "La unidad de medida", "precio_contado": "El precio al contado",
     "precio_lista_credito": "El precio de lista a crédito", "max_meses": "El máximo de meses",
     "valor": "La tasa", "periodo_dias": "El periodo de la tasa", "capitalizacion_dias": "La capitalización",

@@ -6,7 +6,6 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 
 class ProductoBase(BaseModel):
-    codigo: str = Field(min_length=1, max_length=30, description="SKU interno")
     nombre: str = Field(min_length=2, max_length=120)
     descripcion: str | None = Field(None, max_length=300)
     marca: str | None = Field(None, max_length=60)

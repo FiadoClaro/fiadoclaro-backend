@@ -134,13 +134,13 @@ def con_claves(db, admin, cliente):
 @pytest.fixture
 def productos(db, tienda) -> dict[str, Producto]:
     datos = {
-        "pollo": ("T-POLLO", "Pollo fresco", "10.50", True, False, None),
-        "arroz": ("T-ARROZ", "Arroz 5 kg", "24.50", True, True, 3),
-        "tv": ("T-TV", "Televisor", "750.00", True, True, 12),
+        "pollo": ("Pollo fresco", "10.50", True, False, None),
+        "arroz": ("Arroz 5 kg", "24.50", True, True, 3),
+        "tv": ("Televisor", "750.00", True, True, 12),
     }
     out = {}
-    for clave, (cod, nom, precio, fm, cu, mm) in datos.items():
-        p = Producto(tienda_id=tienda.id, codigo=cod, nombre=nom, unidad_medida="Unidad", moneda="PEN",
+    for clave, (nom, precio, fm, cu, mm) in datos.items():
+        p = Producto(tienda_id=tienda.id, nombre=nom, unidad_medida="Unidad", moneda="PEN",
                      precio_contado=D(precio), precio_lista_credito=D(precio), permite_fin_mes=fm,
                      permite_cuotas=cu, max_meses=mm, estado="ACTIVO")
         db.add(p)

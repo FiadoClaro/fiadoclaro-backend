@@ -97,11 +97,19 @@ def to_out(db: Session, cliente: Cliente) -> ClienteOut:
     )
 
 
+def _asegurar_listados(db: Session, tienda_id: int, cliente_id: int | None = None) -> None:
+    """Genera los listados de los cortes ya pasados antes de calcular el estado del cliente (al día / en mora)."""
+    from app.modules.statements.service import asegurar_listados  # import local: evita un ciclo de imports
+
+    asegurar_listados(db, tienda_id, cliente_id)
+
+
 def obtener(db: Session, actor: Actor, cliente_id: int) -> Cliente:
     """Busca un cliente de la tienda del usuario (nunca de otra tienda)."""
     cliente = db.get(Cliente, cliente_id)
     if not cliente or cliente.tienda_id != actor.tienda_id:
         raise NotFoundError("Cliente", cliente_id)
+    _asegurar_listados(db, cliente.tienda_id, cliente.id)
     return cliente
 
 
@@ -166,6 +174,7 @@ def listar(db: Session, actor: Actor, estado: str | None, q: str | None,
     `conteos.estado` alimenta los filtros: TODOS, ACTIVO, BAJA, AL_DIA y EN_MORA (los dos últimos
     solo cuentan clientes activos). Se calculan con la búsqueda aplicada.
     """
+    _asegurar_listados(db, actor.tienda_id)
     stmt = select(Cliente).where(Cliente.tienda_id == actor.tienda_id)
     if q:
         like = f"%{q.strip()}%"
