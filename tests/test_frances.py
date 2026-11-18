@@ -99,19 +99,33 @@ def test_cero_cuotas_no_se_permite():
 
 # ------------------------------------------------------------------------- TCEA
 def test_tcea_iguala_el_valor_presente_de_las_cuotas():
+    """VP de las cuotas a la TCEA = monto, con plazos de gracia + 30 días por mes (Anexo A)."""
     r = engine.compra_en_cuotas(D("1000"), date(2026, 9, 15), date(2026, 9, 26), 3, TEM_3)
     tcea = r.tcea_pct / 100
-    vp = sum(f.cuota / (1 + tcea) ** (D(engine.dias_entre(date(2026, 9, 15), f.fecha_vencimiento)) / 360)
-             for f in r.filas)
+    vp = sum(f.cuota / (1 + tcea) ** (D(r.dias_gracia + 30 * f.numero) / 360) for f in r.filas)
     assert abs(vp - D("1000")) < D("0.01")
 
 
-def test_tcea_cercana_a_la_tea_sin_gracia():
-    """Sin gracia ni costos extra, la TCEA solo se aleja de la TEA por los días reales de cada mes."""
+def test_tcea_igual_a_la_tea_sin_gracia():
+    """Con meses de 30 días, sin gracia ni costos extra, la TCEA coincide con la TEA (salvo céntimos)."""
     r = engine.compra_en_cuotas(D("1000"), date(2026, 9, 26), date(2026, 9, 26), 3, TEM_3)
     tea_pct = engine.tea(TEM_3) * 100
-    assert abs(r.tcea_pct - tea_pct) < D("1.5")
+    assert abs(r.tcea_pct - tea_pct) < D("0.01")
+
+
+def test_tcea_no_depende_de_los_dias_del_calendario():
+    """Febrero (28 días) y octubre (31) dan la misma TCEA: cada mes cuenta 30 días."""
+    feb = engine.compra_en_cuotas(D("1000"), date(2027, 1, 26), date(2027, 1, 26), 3, TEM_3)
+    oct_ = engine.compra_en_cuotas(D("1000"), date(2026, 9, 26), date(2026, 9, 26), 3, TEM_3)
+    assert feb.tcea_pct == oct_.tcea_pct
+
+
+def test_tcea_fin_de_mes_es_la_tasa_efectiva_del_plazo_anualizada():
+    r = engine.compra_fin_de_mes(D("100"), date(2026, 11, 15), date(2026, 12, 5), engine.Tasa("EFECTIVA", D("3.5"), 30))
+    tcea = engine.tcea(D("100"), [(r.dias, r.total)])
+    # 100 * (1 + TCEA)^(20/360) = total
+    assert abs(D("100") * (1 + tcea) ** (D(20) / 360) - r.total) < D("0.0001")
 
 
 def test_tcea_cero_si_no_hay_interes():
-    assert engine.tcea(D("100"), date(2026, 1, 1), [(date(2026, 2, 1), D("100"))]) == 0
+    assert engine.tcea(D("100"), [(30, D("100"))]) == 0

@@ -1,5 +1,20 @@
 services:
+  # API conectada a la base de Supabase: toma DATABASE_URL, JWT_SECRET, etc. del archivo .env
+  #   docker compose up --build
+  api:
+    build: .
+    env_file: .env
+    environment:
+      TIMEZONE: America/Lima
+    ports:
+      - "8000:8000"
+    restart: unless-stopped
+
+  # Postgres local OPCIONAL, solo para trabajar sin internet o correr pruebas sin tocar Supabase:
+  #   docker compose --profile local up -d db
+  # y en el .env: TEST_DATABASE_URL=postgresql+psycopg://postgres:postgres@localhost:5432/fiadoclaro_test
   db:
+    profiles: ["local"]
     image: postgres:16
     environment:
       POSTGRES_USER: postgres
@@ -15,18 +30,6 @@ services:
       test: ["CMD-SHELL", "pg_isready -U postgres"]
       interval: 5s
       retries: 10
-
-  api:
-    build: .
-    environment:
-      DATABASE_URL: postgresql+psycopg://postgres:postgres@db:5432/fiadoclaro
-      JWT_SECRET: ${JWT_SECRET:-cambia-esta-clave-larga-en-produccion-0123456789}
-      TIMEZONE: America/Lima
-    ports:
-      - "8000:8000"
-    depends_on:
-      db:
-        condition: service_healthy
 
 volumes:
   pgdata:

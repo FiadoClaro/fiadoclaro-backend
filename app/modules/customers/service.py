@@ -115,7 +115,7 @@ def obtener(db: Session, actor: Actor, cliente_id: int) -> Cliente:
 
 def _aplicar_condicion(db: Session, cond: CondicionCredito, data: CondicionIn) -> None:
     comp, mora = data.tasa.to_engine(), data.tasa_mora.to_engine()
-    validar_topes(db, comp, mora, hoy())
+    validar_topes(db, comp, mora, hoy(), data.moneda)
     cond.moneda = data.moneda
     cond.tipo_tasa, cond.tasa = comp.tipo, comp.valor_pct
     cond.periodo_tasa_dias, cond.capitalizacion_dias = comp.periodo_dias, comp.capitalizacion_dias

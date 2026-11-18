@@ -59,9 +59,11 @@ def tienda(db) -> Tienda:
                giro="Bodega", estado="ACTIVA")
     db.add(t)
     # Topes BCRP (la semilla puede no estar cargada en la base de pruebas)
-    for tipo, tea in (("COMPENSATORIA", D("114.13")), ("MORATORIA", D("17.12"))):
-        if not db.scalar(select(TopeTasa).where(TopeTasa.tipo == tipo)):
-            db.add(TopeTasa(tipo=tipo, tea_maxima=tea, vigente_desde=datetime(2020, 1, 1).date()))
+    for tipo, moneda, tea in (("COMPENSATORIA", "PEN", D("114.68")), ("MORATORIA", "PEN", D("17.20")),
+                              ("COMPENSATORIA", "USD", D("103.14")), ("MORATORIA", "USD", D("15.47"))):
+        if not db.scalar(select(TopeTasa).where(TopeTasa.tipo == tipo, TopeTasa.moneda == moneda,
+                                                TopeTasa.vigente_desde <= datetime(2020, 1, 1).date())):
+            db.add(TopeTasa(tipo=tipo, moneda=moneda, tea_maxima=tea, vigente_desde=datetime(2020, 1, 1).date()))
     db.flush()
     return t
 

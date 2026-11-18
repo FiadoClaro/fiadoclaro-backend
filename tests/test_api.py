@@ -242,3 +242,37 @@ def test_simular_compra_dentro_del_limite(api, h_admin, cliente, productos):
         "cliente_id": cliente.id, "modalidad": "FIN_MES",
         "items": [{"producto_id": productos["pollo"].id, "cantidad": "1"}]}).json()
     assert s["excede_credito"] is False and D(s["deficit"]) == 0 and s["mensaje"] is None
+
+
+# ------------------------------------------------------------- topes del BCRP por moneda
+def cliente_con_tasa(dni: str, moneda: str, tea_pct: str, tea_mora_pct: str = "15") -> dict:
+    datos = nuevo_cliente(dni)
+    datos["condicion"] |= {"moneda": moneda,
+                           "tasa": {"tipo": "EFECTIVA", "valor": tea_pct, "periodo_dias": 360},
+                           "tasa_mora": {"tipo": "EFECTIVA", "valor": tea_mora_pct, "periodo_dias": 360}}
+    return datos
+
+
+def test_tope_en_soles_permite_tea_de_110(api, h_admin):
+    r = api.post(f"{API}/customers", headers=h_admin, json=cliente_con_tasa("41111111", "PEN", "110"))
+    assert r.status_code == 201, r.text
+
+
+def test_tope_en_dolares_rechaza_tea_de_110(api, h_admin):
+    r = api.post(f"{API}/customers", headers=h_admin, json=cliente_con_tasa("42222222", "USD", "110"))
+    assert r.status_code == 422
+    assert r.json()["code"] == "tasa_supera_tope"
+    assert "103.14" in r.json()["detail"]
+
+
+def test_tope_moratorio_en_dolares(api, h_admin):
+    r = api.post(f"{API}/customers", headers=h_admin, json=cliente_con_tasa("43333333", "USD", "50", "16"))
+    assert r.status_code == 422 and "15.47" in r.json()["detail"]
+
+
+def test_topes_vigentes_publicados(api, h_admin):
+    topes = api.get(f"{API}/finance/topes", headers=h_admin).json()
+    vigentes = {(t["tipo"], t["moneda"]): t["tea_maxima"] for t in topes if t["vigente_desde"] == "2026-11-01"}
+    assert {k: D(v) for k, v in vigentes.items()} == {
+        ("COMPENSATORIA", "PEN"): D("114.68"), ("MORATORIA", "PEN"): D("17.20"),
+        ("COMPENSATORIA", "USD"): D("103.14"), ("MORATORIA", "USD"): D("15.47")}

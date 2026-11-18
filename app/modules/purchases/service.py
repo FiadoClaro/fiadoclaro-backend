@@ -98,7 +98,7 @@ def _calcular(db: Session, actor: Actor, data: CompraIn) -> _Calculo:
 
     # 5. Tasas pactadas y validación del tope vigente
     comp, mora = customers.tasas_de_condicion(cond)
-    validar_topes(db, comp, mora, fecha_hora.date())
+    validar_topes(db, comp, mora, fecha_hora.date(), cond.moneda)
 
     # 6. Ciclo según fecha y hora de corte
     ciclo = engine.ciclo_de_compra(fecha_hora, cond.dia_corte, cond.hora_corte, cond.dia_pago)
@@ -111,7 +111,7 @@ def _calcular(db: Session, actor: Actor, data: CompraIn) -> _Calculo:
         cronograma = [CuotaOut(numero=1, fecha_vencimiento=ciclo.fecha_pago, saldo_inicial=monto,
                                interes=r.interes, amortizacion=monto, cuota=r.total, saldo_final=CERO)]
         interes, capitalizado, valor_cuota, total = r.interes, monto, r.total, r.total
-        tcea_pct = engine.tasa_q(engine.tcea(monto, f_compra, [(ciclo.fecha_pago, r.total)]) * 100)
+        tcea_pct = engine.tasa_q(engine.tcea(monto, [(r.dias, r.total)]) * 100)
         dias = r.dias
     else:
         r = engine.compra_en_cuotas(monto, f_compra, ciclo.fecha_pago, data.num_cuotas, comp)

@@ -1,0 +1,19 @@
+# Secretos: las variables llegan al contenedor por env_file / variables del hosting, nunca dentro de la imagen
+.env
+.env.*
+!.env.example
+
+# Entorno y cachés locales
+.venv/
+venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# Control de versiones, editor y documentación
+.git/
+.gitignore
+.vscode/
+.idea/
+.claude/
+*.md

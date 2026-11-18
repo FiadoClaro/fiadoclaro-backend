@@ -39,6 +39,7 @@ class EquivalenciasOut(BaseModel):
 
 class TopeIn(BaseModel):
     tipo: Literal["COMPENSATORIA", "MORATORIA"]
+    moneda: Literal["PEN", "USD"] = Field("PEN", description="PEN = soles, USD = dólares")
     tea_maxima: Decimal = Field(gt=0, max_digits=12, decimal_places=7, description="TEA máxima en %")
     vigente_desde: date
     fuente: str | None = Field(None, max_length=200)

@@ -245,7 +245,8 @@ def compra_en_cuotas(
         saldo -= amort
 
     total_pagado = sum((f.cuota for f in filas), CERO)
-    flujos = [(f.fecha_vencimiento, f.cuota) for f in filas]
+    # Plazo de cada cuota en días comerciales: la gracia + 30 días por cada mes (Anexo A)
+    flujos = [(dias_gracia + DIAS_MES * f.numero, f.cuota) for f in filas]
     return ResultadoCuotas(
         dias_gracia=dias_gracia,
         interes_gracia=capitalizado - dinero(monto),
@@ -255,22 +256,24 @@ def compra_en_cuotas(
         filas=filas,
         total_intereses=total_pagado - dinero(monto),
         total_pagado=total_pagado,
-        tcea_pct=tasa_q(tcea(monto, fecha_compra, flujos) * CIEN),
+        tcea_pct=tasa_q(tcea(monto, flujos) * CIEN),
     )
 
 
 # ---------------------------------------------------------------- TCEA (TIR)
-def tcea(monto: Decimal, fecha_inicio: date, flujos: list[tuple[date, Decimal]], tol: Decimal = D("1e-7")) -> Decimal:
+def tcea(monto: Decimal, flujos: list[tuple[int, Decimal]], tol: Decimal = D("1e-7")) -> Decimal:
     """
-    Tasa de costo efectivo anual: TIR anual (base 360) que iguala el monto financiado
-    con el valor presente de las cuotas. Se resuelve por bisección.
+    Tasa de costo efectivo anual: TIR anual (base 360) que iguala el monto financiado con el valor
+    presente de los pagos. Se resuelve por bisección.
+
+    `flujos` = [(días desde la compra, monto)]. Los días siguen la convención del Anexo A
+    (mes comercial de 30 días): en cuotas, el pago k ocurre a  días de gracia + 30 * k  días.
+        sum( cuota_k / (1 + TCEA)^(días_k / 360) ) = monto
     """
     monto = D(monto)
 
     def van(r: Decimal) -> Decimal:
-        return sum(
-            (D(c) / (UNO + r) ** (D(dias_entre(fecha_inicio, f)) / DIAS_ANIO) for f, c in flujos), CERO
-        ) - monto
+        return sum((D(c) / (UNO + r) ** (D(dias) / DIAS_ANIO) for dias, c in flujos), CERO) - monto
 
     lo, hi = CERO, D("100")  # 0 % a 10 000 % anual
     if van(lo) <= 0:
