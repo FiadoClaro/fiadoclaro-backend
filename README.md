@@ -1,4 +1,4 @@
-# FiadoClaro — Backend (FastAPI + PostgreSQL)
+# FiadoClaro - Backend (FastAPI + PostgreSQL)
 
 API del sistema de control de cuenta corriente por créditos (fiado) para pequeños negocios.
 Curso SI642 Finanzas e Ingeniería Económica, trabajo final 2026-20.
