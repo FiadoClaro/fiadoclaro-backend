@@ -129,3 +129,55 @@ def test_tcea_fin_de_mes_es_la_tasa_efectiva_del_plazo_anualizada():
 
 def test_tcea_cero_si_no_hay_interes():
     assert engine.tcea(D("100"), [(30, D("100"))]) == 0
+
+
+# ------------------------------------------------------------- casos avanzados
+def test_gracia_extendida_post_corte():
+    """
+    Compra realizada después del corte (gracia extendida de 40 días hasta la fecha de pago).
+    Verifica que la capitalización por más de 30 días mantenga la consistencia del cronograma y de la TCEA.
+    """
+    r = engine.compra_en_cuotas(D("1000"), date(2026, 9, 26), date(2026, 11, 5), 3, Tasa("EFECTIVA", D("3.5"), 30))
+    assert r.dias_gracia == 40
+    assert r.monto_capitalizado == D("1046.94")
+    assert r.cuota == D("373.69")
+    assert r.filas[-1].saldo_final == D("0.00")
+    assert sum(f.amortizacion for f in r.filas) == r.monto_capitalizado
+
+    # VP de las cuotas a la TCEA debe igualar el desembolso inicial de 1000
+    tcea = r.tcea_pct / 100
+    vp = sum(f.cuota / (1 + tcea) ** (D(r.dias_gracia + 30 * f.numero) / 360) for f in r.filas)
+    assert abs(vp - D("1000")) < D("0.01")
+
+
+def test_convergencia_tcea_tasa_maxima_bcrp():
+    """
+    Compra evaluada con la tasa máxima legal del BCRP en Soles (TEA 114.68 %).
+    Verifica que el algoritmo de bisección converja rápidamente y que el cronograma amortice a 0.
+    """
+    t_bcrp = Tasa("EFECTIVA", D("114.68"), 360)
+    r = engine.compra_en_cuotas(D("1500"), date(2026, 11, 1), date(2026, 11, 15), 6, t_bcrp)
+
+    assert r.dias_gracia == 14
+    assert r.filas[-1].saldo_final == D("0.00")
+    assert sum(f.amortizacion for f in r.filas) == r.monto_capitalizado
+
+    # Convergencia numérica de la TCEA
+    tcea = r.tcea_pct / 100
+    vp = sum(f.cuota / (1 + tcea) ** (D(r.dias_gracia + 30 * f.numero) / 360) for f in r.filas)
+    assert abs(vp - D("1500")) < D("0.01")
+
+
+def test_microfinanciamiento_redondeo_centimos():
+    """
+    Financiamiento de montos pequeños (S/ 10.50 en 3 cuotas) con impacto alto de redondeo monetario.
+    Verifica que la última cuota absorba exactamente los céntimos de redondeo y el saldo quede en 0.
+    """
+    r = engine.compra_en_cuotas(D("10.50"), date(2026, 10, 1), date(2026, 10, 10), 3, Tasa("EFECTIVA", D("3.5"), 30))
+    assert r.monto_capitalizado == D("10.61")
+    assert sum(f.amortizacion for f in r.filas) == r.monto_capitalizado
+    assert r.filas[-1].saldo_final == D("0.00")
+    # Todas las cuotas iniciales iguales y la última absorbe el céntimo de ajuste
+    assert r.filas[0].cuota == r.filas[1].cuota == D("3.79")
+    assert r.filas[2].cuota == D("3.78")
+
