@@ -87,8 +87,10 @@ def actualizar_perfil(db: Session, actor: Actor, data: PerfilUpdate) -> Usuario:
                                 code="campo_no_editable")
         cliente = db.scalar(select(Cliente).where(Cliente.usuario_id == usuario.id))
         if cliente:
+            # La ficha del cliente solo comparte el contacto (la foto es del usuario).
             for k, v in cambios.items():
-                setattr(cliente, k, v)
+                if k in ("telefono", "correo"):
+                    setattr(cliente, k, v)
     elif cambios.get("nombre") is None:
         cambios.pop("nombre", None)  # el nombre no se puede dejar vacío
     for k, v in cambios.items():

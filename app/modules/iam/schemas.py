@@ -58,6 +58,7 @@ class UsuarioOut(BaseModel):
     tienda_id: int | None
     telefono: str | None = None
     correo: str | None = None
+    foto_url: str | None = None
     activo: bool
     ultimo_acceso: datetime | None = None
 
@@ -89,3 +90,16 @@ class PerfilUpdate(BaseModel):
                                description="Solo administradores; el nombre del vecino lo administra la tienda")
     telefono: str | None = Field(None, max_length=20)
     correo: EmailStr | None = None
+    foto_url: str | None = Field(None, max_length=500,
+                                 description="Enlace http(s) a la foto de perfil; null la quita")
+
+    @field_validator("foto_url")
+    @classmethod
+    def _foto_es_enlace(cls, v: str | None) -> str | None:
+        # No se suben archivos: solo se guarda el enlace a una imagen ya publicada.
+        if v is None or not v.strip():
+            return None
+        v = v.strip()
+        if not v.lower().startswith(("http://", "https://")):
+            raise ValueError("La foto debe ser un enlace que empiece con http:// o https://")
+        return v

@@ -78,6 +78,16 @@ def test_ver_y_editar_mi_perfil(api, h_admin):
     assert (me["nombre"], me["telefono"], me["correo"]) == ("Luis Morales", "984512870", "lucho@gmail.com")
 
 
+def test_foto_de_perfil_por_enlace(api, h_cliente):
+    url = "https://i.imgur.com/rosa.jpg"
+    r = api.patch(f"{API}/iam/me", headers=h_cliente, json={"foto_url": url})
+    assert r.status_code == 200 and r.json()["foto_url"] == url
+    r = api.patch(f"{API}/iam/me", headers=h_cliente, json={"foto_url": "C:/fotos/rosa.jpg"})
+    assert r.status_code == 422
+    r = api.patch(f"{API}/iam/me", headers=h_cliente, json={"foto_url": None})  # quitar la foto
+    assert r.status_code == 200 and r.json()["foto_url"] is None
+
+
 def test_perfil_sin_cambios(api, h_admin):
     r = api.patch(f"{API}/iam/me", headers=h_admin, json={})
     assert r.status_code == 422 and r.json()["code"] == "sin_cambios"
