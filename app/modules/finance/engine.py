@@ -17,7 +17,7 @@ from __future__ import annotations
 
 import calendar
 from dataclasses import dataclass
-from datetime import date, datetime, time
+from datetime import date, datetime, time, timedelta
 from decimal import ROUND_HALF_UP, Decimal, getcontext
 
 getcontext().prec = 34
@@ -140,17 +140,25 @@ class Ciclo:
     fecha_pago: date
 
 
+def cierre_del_corte(fecha_corte: date, hora_corte: time, tz) -> datetime:
+    """
+    Momento en que se cierra el ciclo. La hora de corte es INCLUSIVE: con corte a las 18:00,
+    una compra a las 18:00 (cualquier segundo de ese minuto) todavía entra en el corte; desde las 18:01, no.
+    """
+    return datetime.combine(fecha_corte, hora_corte.replace(second=0, microsecond=0), tzinfo=tz) + timedelta(minutes=1)
+
+
 def ciclo_de_compra(fecha_hora: datetime, dia_corte: int, hora_corte: time, dia_pago: int) -> Ciclo:
     """
     Decide en qué ciclo de facturación cae una compra.
 
-    Si la compra se hace ANTES de la fecha y hora de corte de su mes, pertenece a ese corte;
+    Si la compra se hace hasta la fecha y hora de corte de su mes (inclusive), pertenece a ese corte;
     si no, al corte del mes siguiente (enunciado, punto 5).
     `fecha_hora` debe venir en la hora local de la tienda (con tzinfo).
     """
     corte_mes = date(fecha_hora.year, fecha_hora.month, dia_corte)
-    corte_dt = datetime.combine(corte_mes, hora_corte, tzinfo=fecha_hora.tzinfo)
-    fecha_corte = corte_mes if fecha_hora < corte_dt else sumar_meses(corte_mes, 1)
+    cierre = cierre_del_corte(corte_mes, hora_corte, fecha_hora.tzinfo)
+    fecha_corte = corte_mes if fecha_hora < cierre else sumar_meses(corte_mes, 1)
     return Ciclo(fecha_corte=fecha_corte, fecha_pago=fecha_pago_de_corte(fecha_corte, dia_pago))
 
 

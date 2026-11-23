@@ -85,7 +85,8 @@ def _generar_para(db: Session, actor: Actor | None, cliente: Cliente, fecha_cort
     """
     cond = cliente.condicion
     momento_corte = _momento_corte(fecha_corte, cond)
-    if ahora() < momento_corte:
+    # Se genera recién cuando cierra el minuto del corte (las compras de las 18:00 aún entran).
+    if ahora() < engine.cierre_del_corte(fecha_corte, cond.hora_corte, ahora().tzinfo):
         return f"Aún no llega el corte ({fecha_corte} {cond.hora_corte:%H:%M})"
     fecha_pago = engine.fecha_pago_de_corte(fecha_corte, cond.dia_pago)
 
@@ -155,7 +156,7 @@ def asegurar_listados(db: Session, tienda_id: int, cliente_id: int | None = None
         cond = cliente.condicion
         # Recorre los cortes desde el que cobra la cuota más antigua hasta el último que ya pasó
         corte = engine.sumar_meses(date(primer_vencimiento.year, primer_vencimiento.month, cond.dia_corte), -2)
-        while _momento_corte(corte, cond) <= ahora():
+        while engine.cierre_del_corte(corte, cond.hora_corte, ahora().tzinfo) <= ahora():
             if engine.fecha_pago_de_corte(corte, cond.dia_pago) >= primer_vencimiento:
                 if isinstance(_generar_para(db, None, cliente, corte), EstadoCuenta):
                     generados += 1

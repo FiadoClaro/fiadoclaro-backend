@@ -41,7 +41,10 @@ def test_no_se_genera_antes_de_la_hora_de_corte(db, admin, cliente, productos):
 def test_se_genera_solo_al_llegar_la_hora_de_corte(db, admin, cliente, productos):
     clock.fijar_ahora(lima(2026, 11, 15, 10, 0))
     comprar(db, admin, cliente, productos["pollo"], "2")
-    clock.fijar_ahora(lima(2026, 11, 25, 18, 0))
+    # 18:00 es inclusive: a esa hora aún entran compras, así que el listado todavía no se genera.
+    clock.fijar_ahora(lima(2026, 11, 25, 18, 0, 30))
+    assert listados(db, admin, cliente).total == 0
+    clock.fijar_ahora(lima(2026, 11, 25, 18, 1))
     pagina = listados(db, admin, cliente)
     assert pagina.total == 1
     ec = statements.obtener(db, admin, pagina.items[0].id)

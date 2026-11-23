@@ -35,8 +35,9 @@ def test_compra_despues_del_corte_pasa_al_mes_siguiente():
 
 @pytest.mark.parametrize("hora, corte_esperado", [
     (time(17, 59), date(2026, 9, 20)),   # un minuto antes: entra en este corte
-    (time(18, 0), date(2026, 10, 20)),   # exactamente a la hora de corte: siguiente ciclo
-    (time(18, 1), date(2026, 10, 20)),
+    (time(18, 0), date(2026, 9, 20)),    # exactamente a la hora de corte: todavía entra (inclusive)
+    (time(18, 0, 59), date(2026, 9, 20)),  # cualquier segundo del minuto de corte
+    (time(18, 1), date(2026, 10, 20)),   # desde el minuto siguiente: siguiente ciclo
 ])
 def test_hora_de_corte(hora, corte_esperado):
     compra = datetime.combine(date(2026, 9, 20), hora, tzinfo=LIMA)

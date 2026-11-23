@@ -63,7 +63,7 @@ Cada módulo tiene `models.py` (tablas), `schemas.py` (entrada/salida), `service
 - Fin de mes: `I = monto × ((1 + TEM)^(días/30) − 1)` entre la compra y la fecha de pago.
 - Cuotas: se capitaliza la gracia `P' = P × (1 + TEP_gracia)`; cuota `R = P' × i / (1 − (1+i)^−n)`;
   la primera vence un mes después de la fecha de pago del ciclo; la última ajusta el redondeo.
-- Ciclo: compra antes de la fecha y hora de corte → ese corte; después → corte del mes siguiente.
+- Ciclo: compra hasta la fecha y hora de corte (inclusive, ese minuto) → ese corte; después → corte del mes siguiente.
 - Mora: tasa moratoria (copiada en la compra) sobre el total que debió pagarse, por los días de atraso.
 - Prelación: mora → interés compensatorio → capital.
 - Cada compra guarda una copia de la tasa pactada; cambiar la condición del cliente no altera compras anteriores.
